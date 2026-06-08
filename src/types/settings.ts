@@ -1,3 +1,27 @@
+export interface SettingsApiErrorBody {
+  message: string;
+  details?: Record<string, unknown>;
+  stack?: string;
+}
+
+export interface SettingsApiErrorResponse {
+  success: false;
+  error: SettingsApiErrorBody;
+  requestId?: string;
+}
+
+export interface SettingsApiResponse {
+  success: boolean;
+  data: AppSettings;
+}
+
+export interface SettingsSaveApiResponse {
+  success: boolean;
+  data?: { ok: boolean };
+  error?: SettingsApiErrorBody;
+  requestId?: string;
+}
+
 export interface AppSettings {
   smtp_host: string;
   smtp_port: string;
@@ -38,11 +62,23 @@ export type SettingsSavePayload = Partial<
 >;
 
 export interface TestEmailPayload {
-  email?: string;
+  email: string;
+}
+
+export interface TestEmailData {
+  ok: boolean;
+  message?: string;
+}
+
+export interface TestEmailApiResponse {
+  success: boolean;
+  data?: TestEmailData;
+  message?: string;
+  error?: SettingsApiErrorBody;
+  requestId?: string;
 }
 
 export interface TestEmailResponse {
-  ok?: boolean;
-  error?: string;
+  ok: boolean;
   message?: string;
 }

@@ -1,5 +1,22 @@
 export type LeadStatus = "new" | "reviewed" | "contacted" | "skip";
 
+export type LeadType =
+  | "Pre-Foreclosure"
+  | "Tax Delinquent"
+  | "Probate"
+  | "Sheriff Sale"
+  | "FSBO"
+  | "Obituary"
+  | "Code Violation"
+  | "Divorce"
+  | "Fire Damage"
+  | "Bankruptcy"
+  | "Lis Pendens"
+  | "Vacant/Abandoned"
+  | "Out-of-State Owner"
+  | "Water Shutoff"
+  | "Other";
+
 export interface Lead {
   id: string;
   county: string;
@@ -23,26 +40,43 @@ export interface Lead {
   sale_amount: string | null;
   description: string | null;
   source_url: string | null;
+  raw_data?: string | null;
   status: LeadStatus;
   notes: string | null;
-  scraped_at: string;
-  skip_traced: boolean;
+  skip_traced: boolean | number;
   st_phone: string | null;
   st_email: string | null;
   st_mailing: string | null;
+  scraped_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LeadsListParams {
   county?: string;
   lead_type?: string;
-  status?: string;
+  status?: LeadStatus | string;
   from_date?: string;
   to_date?: string;
-  limit?: string | number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LeadsListData {
+  leads: Lead[];
+  total: number;
 }
 
 export interface LeadsListResponse {
   leads: Lead[];
+  total: number;
+}
+
+export interface LeadsListApiResponse {
+  success: boolean;
+  data: LeadsListData;
+  message?: string;
+  requestId?: string;
 }
 
 export interface LeadStats {
@@ -54,22 +88,70 @@ export interface LeadStats {
   lastScrapeTime: string | null;
 }
 
-export interface UpdateLeadStatusPayload {
-  status: LeadStatus;
+export interface LeadStatsApiResponse {
+  success: boolean;
+  data: LeadStats;
+  message?: string;
+  requestId?: string;
 }
 
-export interface SkipTraceResponse {
+export interface UpdateLeadPayload {
+  status: LeadStatus;
+  notes?: string;
+}
+
+/** @deprecated Use UpdateLeadPayload */
+export type UpdateLeadStatusPayload = UpdateLeadPayload;
+
+export interface UpdateLeadApiResponse {
   success: boolean;
+  data?: { ok: boolean };
+  message?: string;
+  requestId?: string;
+}
+
+export interface SkipTraceData {
   phone?: string;
   email?: string;
   mailing?: string;
-  error?: string;
+  st_phone?: string;
+  st_email?: string;
+  st_mailing?: string;
 }
 
-export interface LeadsExportParams {
+export interface SkipTraceApiResponse {
+  success: boolean;
+  data?: SkipTraceData;
+  message?: string;
+  error?: string;
+  requestId?: string;
+}
+
+export interface SkipTraceResult {
+  phone?: string | null;
+  email?: string | null;
+  mailing?: string | null;
+}
+
+export type LeadsExportParams = Pick<
+  LeadsListParams,
+  "county" | "lead_type" | "status" | "from_date" | "to_date"
+>;
+
+export interface DeleteLeadsPayload {
   county?: string;
-  lead_type?: string;
-  status?: string;
-  from_date?: string;
-  to_date?: string;
+  source_url?: string;
+  owner_name_contains?: string;
+}
+
+export interface DeleteLeadsData {
+  deleted: number;
+  ok?: boolean;
+}
+
+export interface DeleteLeadsApiResponse {
+  success: boolean;
+  data: DeleteLeadsData;
+  message?: string;
+  requestId?: string;
 }

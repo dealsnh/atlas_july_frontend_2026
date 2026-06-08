@@ -6,7 +6,6 @@ import { Link } from "wouter";
 interface PropertyConditionProps {
   googleMapsConfigured: boolean;
   openAiConfigured: boolean;
-  accentColor: string;
 }
 
 const SAMPLE_RESULTS = [
@@ -23,7 +22,7 @@ const scoreBg = (score: number) =>
   : score >= 50 ? "bg-amber-500/15 border-amber-500/20 text-amber-400"
   : "bg-red-500/15 border-red-500/20 text-red-400";
 
-export default function PropertyCondition({ googleMapsConfigured, openAiConfigured, accentColor }: PropertyConditionProps) {
+export default function PropertyCondition({ googleMapsConfigured, openAiConfigured }: PropertyConditionProps) {
   const [address, setAddress] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const isReady = googleMapsConfigured && openAiConfigured;
@@ -35,14 +34,11 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-7">
-      {/* Page header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
-            Property Condition AI
-          </h1>
-          <p className="text-white/40 text-sm mt-1">
+    <div className="atlas-page-shell atlas-page-shell--6xl atlas-page-shell--spacious">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="atlas-page-title">Property Condition AI</h1>
+          <p className="atlas-page-subtitle">
             Satellite and street-level AI scoring for any property address.
           </p>
         </div>
@@ -88,7 +84,7 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
                 ))}
               </div>
               <Link href="/settings">
-                <a className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90" style={{ backgroundColor: accentColor }}>
+                <a className="atlas-btn text-xs">
                   <Settings className="w-3.5 h-3.5" />
                   Configure in Settings
                 </a>
@@ -99,7 +95,7 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
       )}
 
       {/* Search bar */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={address}
@@ -112,8 +108,7 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
         <button
           onClick={handleAnalyze}
           disabled={!isReady || !address.trim() || isAnalyzing}
-          className="px-6 py-3.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2.5 hover:opacity-90"
-          style={{ backgroundColor: accentColor, boxShadow: isReady ? `0 4px 16px ${accentColor}35` : "none" }}
+          className="atlas-btn atlas-btn-primary-glow w-full sm:w-auto disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isAnalyzing ? (
             <>
@@ -142,10 +137,9 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
             style={{ background: "linear-gradient(135deg, #0e0e1c 0%, #12121f 100%)", border: "1px solid rgba(255,255,255,0.07)" }}
           >
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center mb-4"
-              style={{ backgroundColor: accentColor + "18", border: `1px solid ${accentColor}30` }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center mb-4 atlas-icon-box"
             >
-              <Icon className="w-4 h-4" style={{ color: accentColor }} />
+              <Icon className="w-4 h-4 atlas-accent-text" />
             </div>
             <div className="text-white font-bold text-sm mb-1.5">{label}</div>
             <div className="text-white/40 text-xs leading-relaxed">{desc}</div>
@@ -157,7 +151,7 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
       <div>
         <div className="flex items-center gap-3 mb-5">
           <div className="text-white/30 text-[10px] font-bold uppercase tracking-[0.18em]">Sample Results</div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+          <div className="atlas-badge-accent flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold">
             <Zap className="w-3 h-3" />
             Preview
           </div>
@@ -169,12 +163,12 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
               className="rounded-2xl p-6"
               style={{ background: "linear-gradient(135deg, #0e0e1c 0%, #12121f 100%)", border: "1px solid rgba(255,255,255,0.07)" }}
             >
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
+                <div className="min-w-0">
                   <div className="text-white font-bold text-sm">{result.address}</div>
                   <div className="text-white/40 text-xs mt-1 leading-relaxed">{result.notes}</div>
                 </div>
-                <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border flex-shrink-0 ${scoreBg(result.score)}`}>
+                <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border self-start ${scoreBg(result.score)}`}>
                   <span className="text-2xl font-black" style={{ color: scoreColor(result.score) }}>{result.score}</span>
                   <div>
                     <div className="text-xs font-bold" style={{ color: scoreColor(result.score) }}>{result.condition}</div>
@@ -182,7 +176,7 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: "Roof", score: result.roofScore },
                   { label: "Exterior", score: result.exteriorScore },

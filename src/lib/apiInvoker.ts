@@ -1,4 +1,5 @@
 import type { AxiosRequestConfig } from "axios";
+import { resolveRequestUrl } from "@/lib/apiBaseUrl";
 import axiosInstance from "./axiosInstance";
 
 type ApiInvokerExtraConfig = Omit<AxiosRequestConfig, "url" | "method" | "data" | "params"> & {
@@ -14,7 +15,13 @@ async function apiInvoker<T>(
   config?: ApiInvokerExtraConfig,
 ): Promise<T> {
   try {
-    const response = await axiosInstance({ ...config, url, method, data, params });
+    const response = await axiosInstance({
+      ...config,
+      url: resolveRequestUrl(url),
+      method,
+      data,
+      params,
+    });
     return response.data;
   } catch (error) {
     console.error(`API call to ${url} failed: `, error);

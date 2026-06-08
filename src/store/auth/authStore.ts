@@ -9,9 +9,15 @@ import {
   saveAuthState,
 } from "@/utils/authStorage";
 import { useScrapeStore } from "@/store/scrape/scrapeStore";
+import { useSettingsStore } from "@/store/settings/settingsStore";
+import { useLeadsStore } from "@/store/leads/leadsStore";
+import { useStatsStore } from "@/store/stats/statsStore";
 
 function resetClientStoresAfterSessionEnd() {
   useScrapeStore.getState().resetForSessionEnd();
+  useSettingsStore.getState().resetForSessionEnd();
+  useStatsStore.getState().resetForSessionEnd();
+  useLeadsStore.getState().resetForSessionEnd();
 }
 
 type HydratedAuth = {

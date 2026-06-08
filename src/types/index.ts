@@ -3,32 +3,56 @@ export type {
   SignupRequest,
   AuthResponse,
   AuthUser,
+  LoginApiResponse,
+  AuthSessionApiResponse,
+  SignupApiResponse,
   OkMessageResponse,
 } from "./auth";
 
 export type {
   Lead,
   LeadStatus,
+  LeadType,
+  LeadsListApiResponse,
+  LeadsListData,
   LeadsListParams,
   LeadsListResponse,
   LeadStats,
+  LeadStatsApiResponse,
+  UpdateLeadPayload,
   UpdateLeadStatusPayload,
-  SkipTraceResponse,
+  UpdateLeadApiResponse,
+  SkipTraceApiResponse,
+  SkipTraceData,
+  SkipTraceResult,
   LeadsExportParams,
+  DeleteLeadsPayload,
+  DeleteLeadsData,
+  DeleteLeadsApiResponse,
 } from "./leads";
 
 export type {
   ScrapeStatusResponse,
+  ScrapeStatusApiResponse,
   ScrapeStreamEvent,
   ScrapeRun,
   ScrapeRunsResponse,
+  ScrapeRunsApiResponse,
   TriggerScrapePayload,
+  TriggerScrapeData,
+  TriggerScrapeApiResponse,
   TriggerHistoricalScrapePayload,
 } from "./scrape";
 
 export type {
   AppSettings,
+  SettingsApiErrorBody,
+  SettingsApiErrorResponse,
+  SettingsApiResponse,
+  SettingsSaveApiResponse,
   SettingsSavePayload,
+  TestEmailApiResponse,
+  TestEmailData,
   TestEmailPayload,
   TestEmailResponse,
 } from "./settings";

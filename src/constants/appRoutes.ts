@@ -2,6 +2,7 @@
 export const APP_ROUTES = {
   ROOT: "/",
   LOGIN: "/login",
+  SIGNUP: "/signup",
   COUNTY_SCRAPER: "/county-scraper",
   PROPERTY_CONDITION: "/property-condition",
   SETTINGS: "/settings",

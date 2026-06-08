@@ -1,3 +1,20 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+build
+*.tsbuildinfo
+
+# Vite
+.vite
+
+# Environment variables (keep .env.example committed)
+.env
+.env.*
+!.env.example
+
 # Logs
 logs
 *.log
@@ -7,18 +24,31 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Test / coverage
+coverage
+.nyc_output
+
+# Local overrides
 *.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Deploy / hosting
+.vercel
+.netlify
+
+# Optional local tooling
+public/__manus__

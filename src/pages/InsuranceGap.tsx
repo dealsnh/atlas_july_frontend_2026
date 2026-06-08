@@ -1,5 +1,6 @@
 // Insurance Gap Finder — Properties with spiking premiums in risky areas
 import { useState } from "react";
+import { AtlasSelect } from "@/components/atlas";
 
 const MOCK_RESULTS = [
   { address: "4821 Palmetto Dunes Dr, Myrtle Beach SC", owner: "Eugene F. Butler", femaZone: "AE", floodRisk: "High", climateScore: 82, premiumSpike: "+67%", landlord: true, insuranceCost: "$8,400/yr", equity: "$142K" },
@@ -19,6 +20,10 @@ export default function InsuranceGap() {
   const [uploaded, setUploaded] = useState(false);
   const [ran, setRan] = useState(false);
   const [running, setRunning] = useState(false);
+  const [minPremiumSpike, setMinPremiumSpike] = useState("30");
+  const [ownerType, setOwnerType] = useState("landlords");
+  const [femaZone, setFemaZone] = useState("all");
+  const [climateScore, setClimateScore] = useState("60");
 
   const handleRun = () => {
     setRunning(true);
@@ -68,35 +73,51 @@ export default function InsuranceGap() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
           <div>
             <div style={{ fontSize: 12, color: "oklch(0.45 0.02 40)", marginBottom: 6 }}>Min Premium Spike</div>
-            <select className="atlas-input" style={{ fontSize: 13 }}>
-              <option>30% or more</option>
-              <option>50% or more</option>
-              <option>100% or more</option>
-            </select>
+            <AtlasSelect
+              value={minPremiumSpike}
+              onValueChange={setMinPremiumSpike}
+              options={[
+                { value: "30", label: "30% or more" },
+                { value: "50", label: "50% or more" },
+                { value: "100", label: "100% or more" },
+              ]}
+            />
           </div>
           <div>
             <div style={{ fontSize: 12, color: "oklch(0.45 0.02 40)", marginBottom: 6 }}>Owner Type</div>
-            <select className="atlas-input" style={{ fontSize: 13 }}>
-              <option>Landlords Only</option>
-              <option>All Owners</option>
-              <option>Absentee Only</option>
-            </select>
+            <AtlasSelect
+              value={ownerType}
+              onValueChange={setOwnerType}
+              options={[
+                { value: "landlords", label: "Landlords Only" },
+                { value: "all", label: "All Owners" },
+                { value: "absentee", label: "Absentee Only" },
+              ]}
+            />
           </div>
           <div>
             <div style={{ fontSize: 12, color: "oklch(0.45 0.02 40)", marginBottom: 6 }}>FEMA Zone</div>
-            <select className="atlas-input" style={{ fontSize: 13 }}>
-              <option>All Zones</option>
-              <option>High Risk (AE, VE)</option>
-              <option>Very High (VE Only)</option>
-            </select>
+            <AtlasSelect
+              value={femaZone}
+              onValueChange={setFemaZone}
+              options={[
+                { value: "all", label: "All Zones" },
+                { value: "high", label: "High Risk (AE, VE)" },
+                { value: "very-high", label: "Very High (VE Only)" },
+              ]}
+            />
           </div>
           <div>
             <div style={{ fontSize: 12, color: "oklch(0.45 0.02 40)", marginBottom: 6 }}>ClimateCheck Score</div>
-            <select className="atlas-input" style={{ fontSize: 13 }}>
-              <option>60+ (Elevated Risk)</option>
-              <option>75+ (High Risk)</option>
-              <option>90+ (Critical Risk)</option>
-            </select>
+            <AtlasSelect
+              value={climateScore}
+              onValueChange={setClimateScore}
+              options={[
+                { value: "60", label: "60+ (Elevated Risk)" },
+                { value: "75", label: "75+ (High Risk)" },
+                { value: "90", label: "90+ (Critical Risk)" },
+              ]}
+            />
           </div>
         </div>
       </div>

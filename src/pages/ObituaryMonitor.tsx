@@ -1,5 +1,6 @@
 // Obituary Monitor — Probate leads from local obituaries cross-referenced to county
 import { useState } from "react";
+import { AtlasSelect } from "@/components/atlas";
 
 const MOCK_OBITS = [
   { name: "Harold Eugene Greene", age: 78, published: "04/07/2026", source: "Myrtle Beach Sun News", city: "Conway, SC", properties: 2, totalValue: "$487K", heirs: ["Michael Greene", "Patricia Greene-Walsh"], skipTraced: true, probateFiled: true, caseNum: "2026-PB-26-00078", lead: { address: "908 Waccamaw Pines Dr, Conway SC", equity: "$312K" } },
@@ -10,6 +11,8 @@ const MOCK_OBITS = [
 
 export default function ObituaryMonitor() {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [schedule, setSchedule] = useState("daily-6");
+  const [minPropertyValue, setMinPropertyValue] = useState("50000");
 
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -99,16 +102,26 @@ export default function ObituaryMonitor() {
           </div>
           <div>
             <div style={{ fontSize: 12, color: "oklch(0.45 0.02 40)", marginBottom: 6 }}>Schedule</div>
-            <select className="atlas-input" style={{ fontSize: 13, marginBottom: 10 }}>
-              <option>Daily at 6:00 AM</option>
-              <option>Daily at 7:00 AM</option>
-            </select>
+            <div style={{ marginBottom: 10 }}>
+              <AtlasSelect
+                value={schedule}
+                onValueChange={setSchedule}
+                options={[
+                  { value: "daily-6", label: "Daily at 6:00 AM" },
+                  { value: "daily-7", label: "Daily at 7:00 AM" },
+                ]}
+              />
+            </div>
             <div style={{ fontSize: 12, color: "oklch(0.45 0.02 40)", marginBottom: 6 }}>Min Property Value</div>
-            <select className="atlas-input" style={{ fontSize: 13 }}>
-              <option>$50,000+</option>
-              <option>$100,000+</option>
-              <option>$200,000+</option>
-            </select>
+            <AtlasSelect
+              value={minPropertyValue}
+              onValueChange={setMinPropertyValue}
+              options={[
+                { value: "50000", label: "$50,000+" },
+                { value: "100000", label: "$100,000+" },
+                { value: "200000", label: "$200,000+" },
+              ]}
+            />
           </div>
         </div>
       </div>

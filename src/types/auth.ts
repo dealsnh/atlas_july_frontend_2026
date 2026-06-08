@@ -26,7 +26,24 @@ export interface AuthResponse {
 export interface AuthUser {
   id: string;
   email: string;
+  name?: string;
+  created_at?: string;
 }
+
+export interface AuthSessionApiResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    user: AuthUser;
+    token: string;
+  };
+  requestId?: string;
+}
+
+/** @deprecated Use AuthSessionApiResponse */
+export type LoginApiResponse = AuthSessionApiResponse;
+
+export type SignupApiResponse = AuthSessionApiResponse;
 
 export interface OkMessageResponse {
   ok: boolean;

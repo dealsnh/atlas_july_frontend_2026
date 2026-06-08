@@ -7,11 +7,19 @@
  * 4. Email Delivery — SMTP + recipient list
  */
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { getApiErrorMessage } from "@/lib/apiToast";
-import { getSettings, saveSettings, testEmailSettings } from "@/services/settingsServices";
-import type { AppSettings } from "@/types";
-import { settingsSaveSchema } from "@/validations";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { formatLastScrapeTime } from "@/lib/dateTimeFormat";
+import { prepareSettingsSavePayload } from "@/services/settingsServices";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useSettingsStore, useStatsStore, settingsToFormValues } from "@/store";
+import { settingsSaveSchema, testEmailSchema } from "@/validations";
 import {
   CheckCircle, XCircle, AlertCircle, Clock,
   ChevronDown, ChevronRight, Save, Eye, EyeOff,
@@ -242,46 +250,46 @@ function StatusBadge({ status }: { status: LeadStatus }) {
   );
 }
 
-function Section({ title, icon, children, defaultOpen = true, accent }: {
+function Section({ title, icon, children, defaultOpen = true, accentClass }: {
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
-  accent?: string;
+  accentClass?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+    <div className="bg-white/[0.04] border border-white/10 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-700/30 transition-colors"
+        className="w-full flex items-center justify-between px-4 sm:px-6 py-4 text-left hover:bg-white/[0.04] transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <span className={accent || "text-blue-400"}>{icon}</span>
-          <span className="font-semibold text-white">{title}</span>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={accentClass || "shrink-0 atlas-accent-text"}>{icon}</span>
+          <span className="font-semibold text-white text-left">{title}</span>
         </div>
-        {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+        {open ? <ChevronDown className="w-4 h-4 text-white/40 shrink-0" /> : <ChevronRight className="w-4 h-4 text-white/40 shrink-0" />}
       </button>
-      {open && <div className="px-6 pb-6 pt-2">{children}</div>}
+      {open && <div className="px-4 sm:px-6 pb-5 sm:pb-6 pt-2">{children}</div>}
     </div>
   );
 }
 
 function SubSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="border border-slate-700/40 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-900/40 border-b border-slate-700/40">
-        {icon && <span className="text-blue-400">{icon}</span>}
+    <div className="border border-white/10 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.03] border-b border-white/10">
+        {icon && <span className="atlas-accent-text">{icon}</span>}
         <span className="font-semibold text-white text-sm">{title}</span>
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-3 sm:p-4">{children}</div>
     </div>
   );
 }
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <div className="bg-slate-900/80 rounded-lg p-3 text-xs text-slate-300 font-mono border border-slate-700/40 whitespace-pre-wrap break-all">
+    <div className="bg-black/40 rounded-lg p-3 text-xs text-white/70 font-mono border border-white/10 whitespace-pre-wrap break-all">
       {children}
     </div>
   );
@@ -290,10 +298,12 @@ function CodeBlock({ children }: { children: string }) {
 function Step({ n, label, children }: { n: string | number; label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <div className="w-6 h-6 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{n}</div>
-      <div className="flex-1">
+      <div className="atlas-step-badge">
+        {n}
+      </div>
+      <div className="flex-1 min-w-0">
         <p className="font-medium text-white text-sm mb-1">{label}</p>
-        <div className="text-slate-400 text-xs space-y-1">{children}</div>
+        <div className="text-white/45 text-xs space-y-1">{children}</div>
       </div>
     </div>
   );
@@ -310,57 +320,61 @@ function InputField({ label, value, onChange, placeholder, hint, masked }: {
   const [show, setShow] = useState(false);
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1.5">{label}</label>
+      <label className="block text-sm font-medium text-white/60 mb-1.5">{label}</label>
       <div className="relative">
         <input
           type={masked && !show ? "password" : "text"}
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full bg-slate-900/60 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-colors"
+          className="w-full bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-colors"
         />
         {masked && (
           <button type="button" onClick={() => setShow(!show)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70">
             {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         )}
       </div>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-white/35">{hint}</p>}
     </div>
   );
 }
 
 export default function Settings() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const settings = useSettingsStore((s) => s.settings);
+  const isLoading = useSettingsStore((s) => s.isLoading);
+  const saving = useSettingsStore((s) => s.isSaving);
+  const testingEmail = useSettingsStore((s) => s.isTestingEmail);
+  const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const saveSettings = useSettingsStore((s) => s.saveSettings);
+  const testEmail = useSettingsStore((s) => s.testEmail);
+  const stats = useStatsStore((s) => s.stats);
+  const statsLoading = useStatsStore((s) => s.isLoading);
+  const fetchStats = useStatsStore((s) => s.fetchStats);
+
   const [form, setForm] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [testingEmail, setTestingEmail] = useState(false);
   const [expandedCounty, setExpandedCounty] = useState<string | null>(null);
   const [showEndpoints, setShowEndpoints] = useState(false);
+  const [showTestEmailDialog, setShowTestEmailDialog] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState("");
 
   useEffect(() => {
-    getSettings()
-      .then((data) => {
-        setSettings(data);
-        setForm({
-          smtp_host: data.smtp_host || "",
-          smtp_port: data.smtp_port || "587",
-          smtp_user: data.smtp_user || "",
-          smtp_from: data.smtp_from || "",
-          email_recipients: data.email_recipients || "",
-          auto_skip_trace: data.auto_skip_trace || "false",
-          bright_data_user: data.bright_data_user || "",
-        });
-      })
-      .catch(() => toast.error("Failed to load settings"));
-  }, []);
+    fetchSettings()
+      .then((data) => setForm(settingsToFormValues(data)))
+      .catch((e) => showApiErrorToast(e));
+  }, [fetchSettings]);
+
+  useEffect(() => {
+    fetchStats().catch((e) => showApiErrorToast(e));
+  }, [fetchStats]);
 
   const set = (key: string) => (value: string) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
   const handleSave = async () => {
-    setSaving(true);
+    if (!settings) return;
+
     try {
       const payload: Record<string, string> = {};
       for (const [k, v] of Object.entries(form)) {
@@ -370,94 +384,156 @@ export default function Settings() {
       const parsed = settingsSaveSchema.safeParse(payload);
       if (!parsed.success) {
         const firstIssue = parsed.error.issues[0]?.message ?? "Invalid settings";
-        toast.error(firstIssue);
+        showApiErrorToast(firstIssue);
         return;
       }
 
-      const updated = await saveSettings(parsed.data);
-      setSettings(updated);
-      toast.success("Settings saved successfully");
+      const { settings: updated, message } = await saveSettings(
+        prepareSettingsSavePayload(parsed.data, settings),
+      );
+      setForm(settingsToFormValues(updated));
+      showApiSuccessToast(message ?? "Settings saved successfully");
     } catch (e) {
-      toast.error(getApiErrorMessage(e));
-    } finally {
-      setSaving(false);
+      showApiErrorToast(e);
     }
+  };
+
+  const handleOpenTestEmailDialog = () => {
+    setTestEmailAddress("");
+    setShowTestEmailDialog(true);
   };
 
   const handleTestEmail = async () => {
-    setTestingEmail(true);
     try {
-      const email = form.email_recipients?.split(",")[0]?.trim();
-      const data = await testEmailSettings({ email });
-      if (data.error) throw new Error(data.error);
-      toast.success("Test email sent successfully");
+      const parsed = testEmailSchema.safeParse({ email: testEmailAddress.trim() });
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]?.message ?? "Invalid email address";
+        showApiErrorToast(firstIssue);
+        return;
+      }
+
+      const { message } = await testEmail(parsed.data);
+      showApiSuccessToast(message ?? "Test email sent successfully");
+      setShowTestEmailDialog(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : getApiErrorMessage(e));
-    } finally {
-      setTestingEmail(false);
+      showApiErrorToast(e);
     }
   };
 
-  if (!settings) {
+  if (isLoading || !settings) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+        <RefreshCw className="w-6 h-6 animate-spin text-white/40" />
       </div>
     );
   }
 
   const allSources = LEAD_MATRIX.flatMap(c => c.sources);
-  const liveCnt = allSources.filter(s => s.status === "live").length;
-  const needsActionCnt = allSources.filter(s => ["needs_attom", "needs_brightdata", "possible"].includes(s.status)).length;
   const staleCnt = allSources.filter(s => s.status === "stale").length;
-  const totalCounties = LEAD_MATRIX.length;
 
-  const stateGroups = [
-    { label: "Missouri", counties: LEAD_MATRIX.filter(c => c.state === "MO") },
-    { label: "Ohio", counties: LEAD_MATRIX.filter(c => c.state === "OH") },
-    { label: "Alabama", counties: LEAD_MATRIX.filter(c => c.state === "AL") },
-  ];
+  const statCardVariants = [
+    { surface: "atlas-accent-surface", value: "atlas-accent-text" },
+    { surface: "bg-emerald-500/10 border border-emerald-500/20", value: "text-emerald-300" },
+    { surface: "bg-orange-500/10 border border-orange-500/20", value: "text-orange-300" },
+    { surface: "bg-white/5 border border-white/10", value: "text-white" },
+    { surface: "bg-slate-700/30 border border-slate-600/30", value: "text-slate-300" },
+  ] as const;
+
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="atlas-page-shell atlas-page-shell--5xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-slate-400 mt-1">Configure Atlas, manage lead sources, and set up API keys</p>
+        <h1 className="atlas-page-title">Settings</h1>
+        <p className="atlas-page-subtitle">Configure Atlas, manage lead sources, and set up API keys</p>
       </div>
 
-      {/* SUMMARY BANNER */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-300">{liveCnt}</div>
-          <div className="text-xs text-emerald-400 mt-1">Lead sources live</div>
+      {/* LIVE DATABASE STATS */}
+      {statsLoading && !stats ? (
+        <div className="flex items-center justify-center py-10 text-white/40">
+          <RefreshCw className="w-5 h-5 animate-spin" />
         </div>
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-blue-300">{totalCounties}</div>
-          <div className="text-xs text-blue-400 mt-1">Counties active</div>
+      ) : stats ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">{stats.total.toLocaleString()}</div>
+              <div className="text-xs text-white/40 mt-1">Total leads</div>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">{stats.today.toLocaleString()}</div>
+              <div className="text-xs text-white/40 mt-1">Added today</div>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">
+                {formatLastScrapeTime(stats.lastScrapeTime)}
+              </div>
+              <div className="text-xs text-white/40 mt-1">Last scrape</div>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">
+                {formatLastScrapeTime(stats.lastRun)}
+              </div>
+              <div className="text-xs text-white/40 mt-1">Last run</div>
+            </div>
+          </div>
+
+          {stats.byType.length > 0 && (
+            <div className="space-y-3">
+              <div className="atlas-label">Leads by type</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {stats.byType.map((item, index) => {
+                  const variant = statCardVariants[index % statCardVariants.length];
+                  return (
+                    <div
+                      key={item.lead_type}
+                      className={`${variant.surface} rounded-xl p-4 text-center`}
+                    >
+                      <div className={`text-2xl font-bold ${variant.value}`}>
+                        {item.count.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-white/50 mt-1 leading-snug">{item.lead_type}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {stats.byCounty.length > 0 && (
+            <div className="space-y-3">
+              <div className="atlas-label">Leads by county</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {stats.byCounty.map((item, index) => {
+                  const variant = statCardVariants[index % statCardVariants.length];
+                  return (
+                    <div
+                      key={item.county}
+                      className={`${variant.surface} rounded-xl p-4 text-center`}
+                    >
+                      <div className={`text-2xl font-bold ${variant.value}`}>
+                        {item.count.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-white/50 mt-1">{item.county}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-orange-300">{needsActionCnt}</div>
-          <div className="text-xs text-orange-400 mt-1">Need action</div>
-        </div>
-        <div className="bg-slate-700/30 border border-slate-600/30 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-slate-300">6:00 AM</div>
-          <div className="text-xs text-slate-400 mt-1">Daily scrape (EST)</div>
-        </div>
-      </div>
+      ) : null}
 
       {/* HOW ATLAS WORKS — FULL REBUILD GUIDE */}
-      <Section title="How Atlas Works — Full Setup & Rebuild Guide" icon={<BookOpen className="w-5 h-5" />} defaultOpen={false}>
+      {/* <Section title="How Atlas Works — Full Setup & Rebuild Guide" icon={<BookOpen className="w-5 h-5" />} defaultOpen={false}>
         <div className="space-y-6 text-sm">
 
-          {/* Overview */}
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="atlas-accent-surface-lg rounded-lg p-4">
             <p className="font-semibold text-white text-base mb-2">What Atlas Is</p>
             <p className="text-slate-300 text-sm leading-relaxed">
               Atlas is a fully automated real estate lead generation system that runs on your own server 24/7. Every morning at 6:00 AM Eastern Time, it scrapes motivated seller leads from county court systems, open data portals, PACER bankruptcy feeds, Craigslist, and assessor databases across Missouri, Ohio, and Alabama. It enriches each lead with the property owner's name and address, deduplicates, stores everything in a permanent database, and emails you a fresh CSV. You own the code, the server, and the data — it runs forever with no monthly platform fees.
             </p>
           </div>
 
-          {/* Daily Flow */}
           <SubSection title="Daily Automated Flow" icon={<Cpu className="w-4 h-4" />}>
             <div className="space-y-3">
               {[
@@ -473,7 +549,6 @@ export default function Settings() {
             </div>
           </SubSection>
 
-          {/* Architecture */}
           <SubSection title="Architecture & File Structure" icon={<Server className="w-4 h-4" />}>
             <div className="space-y-3">
               <div className="grid md:grid-cols-2 gap-3 text-xs">
@@ -520,7 +595,6 @@ client/src/
             </div>
           </SubSection>
 
-          {/* How Scrapers Work */}
           <SubSection title="How Each Scraper Type Works" icon={<Code2 className="w-4 h-4" />}>
             <div className="space-y-3 text-xs">
               {[
@@ -579,7 +653,6 @@ client/src/
             </div>
           </SubSection>
 
-          {/* How Enrichment Works */}
           <SubSection title="How Enrichment Works" icon={<MapPin className="w-4 h-4" />}>
             <div className="space-y-3 text-xs text-slate-400">
               <p>Every lead goes through two enrichment functions in <code className="text-blue-300 bg-slate-900/60 px-1 rounded">server/scrapers/assessor.ts</code>:</p>
@@ -611,7 +684,6 @@ client/src/
             </div>
           </SubSection>
 
-          {/* Connecting Your Own Manus */}
           <SubSection title="Connecting Your Own Manus to Atlas" icon={<Globe className="w-4 h-4" />}>
             <div className="space-y-4 text-xs">
               <p className="text-slate-400">Atlas runs on your own Railway server and GitHub repo. To have your own Manus agent update it, give it write access to both. Takes about 5 minutes.</p>
@@ -655,7 +727,6 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
           </SubSection>
 
-          {/* Manus Prompt Examples */}
           <SubSection title="What to Ask Manus" icon={<Terminal className="w-4 h-4" />}>
             <div className="grid md:grid-cols-2 gap-2 text-xs">
               {[
@@ -678,7 +749,6 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
           </SubSection>
 
-          {/* Troubleshooting */}
           <SubSection title="Troubleshooting Common Issues" icon={<AlertTriangle className="w-4 h-4" />}>
             <div className="grid md:grid-cols-2 gap-2 text-xs">
               {[
@@ -699,7 +769,6 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
           </SubSection>
 
-          {/* Paid Subscriptions */}
           <SubSection title="Paid Subscriptions Required" icon={<Lock className="w-4 h-4" />}>
             <div className="space-y-3 text-xs">
               {[
@@ -733,12 +802,10 @@ I need you to: [describe what you want]`}</CodeBlock>
           </SubSection>
 
         </div>
-      </Section>
+      </Section> */}
 
-      {/* LEAD SOURCE MATRIX */}
-      <Section title="Lead Source Matrix" icon={<Database className="w-5 h-5" />}>
+      {/* <Section title="Lead Source Matrix" icon={<Database className="w-5 h-5" />}>
         <div className="space-y-4">
-          {/* Legend + controls */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2 text-xs">
               {(Object.entries(STATUS_CONFIG) as [LeadStatus, typeof STATUS_CONFIG[LeadStatus]][])
@@ -758,7 +825,6 @@ I need you to: [describe what you want]`}</CodeBlock>
             </button>
           </div>
 
-          {/* Action callouts */}
           <div className="space-y-2">
             {!settings.bright_data_configured && (
               <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-4 py-3 text-xs text-purple-300 flex items-start gap-2">
@@ -780,7 +846,6 @@ I need you to: [describe what you want]`}</CodeBlock>
             )}
           </div>
 
-          {/* State groups */}
           {stateGroups.map(group => (
             <div key={group.label}>
               <div className="flex items-center gap-3 mb-2">
@@ -846,10 +911,10 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
           ))}
         </div>
-      </Section>
+      </Section> */}
 
       {/* API KEYS */}
-      <Section title="API Keys" icon={<Key className="w-5 h-5" />} accent="text-orange-400">
+      <Section title="API Keys" icon={<Key className="w-5 h-5" />} accentClass="text-orange-400">
         <div className="space-y-6">
 
           {/* Bright Data */}
@@ -965,11 +1030,7 @@ I need you to: [describe what you want]`}</CodeBlock>
           </div>
 
           <div className="pt-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
-            >
+            <button type="button" onClick={handleSave} disabled={saving} className="atlas-btn disabled:opacity-50">
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? "Saving..." : "Save API Keys"}
             </button>
@@ -978,7 +1039,7 @@ I need you to: [describe what you want]`}</CodeBlock>
       </Section>
 
       {/* EMAIL DELIVERY */}
-      <Section title="Email Delivery" icon={<Mail className="w-5 h-5" />} accent="text-emerald-400">
+      <Section title="Email Delivery" icon={<Mail className="w-5 h-5" />} accentClass="text-emerald-400">
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-900/40 rounded-lg px-4 py-3 border border-slate-700/40">
             <Info className="w-4 h-4 flex-shrink-0 text-blue-400" />
@@ -1048,26 +1109,59 @@ I need you to: [describe what you want]`}</CodeBlock>
             />
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
-            >
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button type="button" onClick={handleSave} disabled={saving} className="atlas-btn disabled:opacity-50">
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? "Saving..." : "Save Email Settings"}
             </button>
             <button
-              onClick={handleTestEmail}
-              disabled={testingEmail || !form.email_recipients}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              onClick={handleOpenTestEmailDialog}
+              disabled={testingEmail}
+              className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.10] border border-white/10 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              {testingEmail ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              {testingEmail ? "Sending..." : "Send Test Email"}
+              <Mail className="w-4 h-4" />
+              Send Test Email
             </button>
           </div>
         </div>
       </Section>
+
+      <Dialog open={showTestEmailDialog} onOpenChange={setShowTestEmailDialog}>
+        <DialogContent className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Send Test Email</DialogTitle>
+            <DialogDescription className="text-white/45">
+              Enter the email address that should receive a test message using your saved SMTP settings.
+            </DialogDescription>
+          </DialogHeader>
+          <InputField
+            label="Recipient Email"
+            value={testEmailAddress}
+            onChange={setTestEmailAddress}
+            placeholder="example@mail.com"
+            hint="This address will receive the test email."
+          />
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setShowTestEmailDialog(false)}
+              disabled={testingEmail}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 border border-white/10 hover:bg-white/[0.06] disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleTestEmail}
+              disabled={testingEmail || !testEmailAddress.trim()}
+              className="atlas-btn disabled:opacity-50"
+            >
+              {testingEmail ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              {testingEmail ? "Sending..." : "Send Test Email"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,22 +1,35 @@
 // County Scraper — full-stack live data version
 import { useState, useEffect, useCallback } from "react";
-import { MapPin, Clock, Download, RefreshCw, Filter, Search, Calendar, ChevronDown, ChevronUp, Database, Zap, History, UserSearch, Phone, Mail, CheckCircle2 } from "lucide-react";
+import { MapPin, Clock, Download, RefreshCw, Filter, Search, ChevronDown, ChevronUp, Database, Zap, History, UserSearch, Phone, Mail, CheckCircle2, Activity, Trash2 } from "lucide-react";
+import { AtlasDatePicker, AtlasSelect } from "@/components/atlas";
+import { LEAD_STATUSES, LEAD_TYPES } from "@/constants/leadFilters";
+import { formatLastScrapeTime, getLastScrapeTimestamp } from "@/lib/dateTimeFormat";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import {
-  buildLeadsExportUrl,
-  getLeadStats,
-  getLeads,
+  deleteLeads,
+  exportLeadsCsv,
   skipTraceLead,
-  updateLeadStatus,
+  updateLead,
 } from "@/services/leadsServices";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   getScrapeRuns,
   getScrapeStatus,
-  getScrapeStreamUrl,
+  subscribeScrapeStream,
   triggerHistoricalScrape,
   triggerScrape,
 } from "@/services/scrapeServices";
+import { useLeadsStore } from "@/store/leads/leadsStore";
 import { useScrapeStore } from "@/store/scrape/scrapeStore";
-import type { Lead, LeadStats, LeadStatus } from "@/types";
+import { useStatsStore } from "@/store/stats/statsStore";
+import type { LeadStatus, LeadsExportParams, LeadsListParams, ScrapeStatusResponse } from "@/types";
 
 const STATUS_CONFIG = {
   new: { label: "New", className: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" },
@@ -40,17 +53,44 @@ const TYPE_COLORS: Record<string, string> = {
   "Vacant/Abandoned": "bg-lime-500/15 text-lime-400 border border-lime-500/20",
   "Vacant": "bg-lime-500/15 text-lime-400 border border-lime-500/20",
   "Bankruptcy": "bg-purple-500/15 text-purple-400 border border-purple-500/20",
+  "Out-of-State Owner": "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20",
+  "Other": "bg-neutral-500/15 text-neutral-400 border border-neutral-500/20",
 };
+
+function isSkipTraced(value: boolean | number | undefined): boolean {
+  return value === true || value === 1;
+}
+
+function SkipTraceBadge({ skipTraced, compact = false }: { skipTraced: boolean | number | undefined; compact?: boolean }) {
+  const traced = isSkipTraced(skipTraced);
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${
+        traced
+          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+          : "bg-white/5 text-white/40 border-white/10"
+      }`}
+      title={traced ? "Skip trace completed" : "Not skip traced yet"}
+    >
+      {traced ? <CheckCircle2 className="w-3 h-3" /> : <UserSearch className="w-3 h-3" />}
+      {compact ? (traced ? "Traced" : "Not traced") : (traced ? "Skip Traced" : "Not Traced")}
+    </span>
+  );
+}
 
 interface CountyScraperProps {
   counties: Array<{ name: string; state: string; leadTypes: string[] }>;
-  accentColor: string;
 }
 
-export default function CountyScraper({ counties, accentColor }: CountyScraperProps) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [stats, setStats] = useState<LeadStats | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function CountyScraper({ counties }: CountyScraperProps) {
+  const leads = useLeadsStore((s) => s.leads);
+  const leadsTotal = useLeadsStore((s) => s.total);
+  const loading = useLeadsStore((s) => s.isLoading);
+  const fetchLeads = useLeadsStore((s) => s.fetchLeads);
+  const updateLeadInList = useLeadsStore((s) => s.updateLeadInList);
+  const stats = useStatsStore((s) => s.stats);
+  const fetchStats = useStatsStore((s) => s.fetchStats);
   const [tracingIds, setTracingIds] = useState<Set<string>>(() => new Set());
   const scraping = useScrapeStore((s) => s.scraping);
   const scrapeLog = useScrapeStore((s) => s.scrapeLog);
@@ -70,101 +110,136 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
   const [showHistorical, setShowHistorical] = useState(false);
   const [historicalDays, setHistoricalDays] = useState(30);
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [savingNotesId, setSavingNotesId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [showRunHistory, setShowRunHistory] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [showDeleteLeadsDialog, setShowDeleteLeadsDialog] = useState(false);
+  const [deleteCounty, setDeleteCounty] = useState("");
+  const [deleteSourceUrl, setDeleteSourceUrl] = useState("");
+  const [deleteOwnerNameContains, setDeleteOwnerNameContains] = useState("");
+  const [deletingLeads, setDeletingLeads] = useState(false);
   const PAGE_SIZE = 50;
 
-  const buildListParams = useCallback(() => {
-    const params: Record<string, string> = { limit: "500" };
-    if (selectedCounty !== "all") params.county = selectedCounty;
-    if (selectedType !== "all") params.lead_type = selectedType;
-    if (selectedStatus !== "all") params.status = selectedStatus;
-    if (fromDate) params.from_date = fromDate;
-    if (toDate) params.to_date = toDate;
-    return params;
-  }, [selectedCounty, selectedType, selectedStatus, fromDate, toDate]);
-
-  const buildExportParams = useCallback(() => {
-    const params: Record<string, string> = {};
-    if (selectedCounty !== "all") params.county = selectedCounty;
-    if (selectedType !== "all") params.lead_type = selectedType;
-    if (selectedStatus !== "all") params.status = selectedStatus;
-    if (fromDate) params.from_date = fromDate;
-    if (toDate) params.to_date = toDate;
-    return params;
-  }, [selectedCounty, selectedType, selectedStatus, fromDate, toDate]);
-
-  const fetchLeads = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getLeads(buildListParams());
-      setLeads(data.leads);
-    } catch (e) {
-      console.error("Failed to fetch leads:", e);
-    } finally {
-      setLoading(false);
+  const applyScrapeStatus = useCallback((data: ScrapeStatusResponse) => {
+    setScraping(data.in_progress);
+    if (data.log?.length) {
+      setScrapeLog(data.log);
+    } else if (data.in_progress) {
+      setScrapeLog(["Scrape in progress..."]);
+    } else {
+      setScrapeLog([]);
     }
-  }, [buildListParams]);
+  }, [setScrapeLog, setScraping]);
 
-  const fetchStats = useCallback(async () => {
+  const buildListParams = useCallback((): LeadsListParams => {
+    const params: LeadsListParams = {
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    };
+    if (selectedCounty !== "all") params.county = selectedCounty;
+    if (selectedType !== "all") params.lead_type = selectedType;
+    if (selectedStatus !== "all") params.status = selectedStatus;
+    if (fromDate) params.from_date = fromDate;
+    if (toDate) params.to_date = toDate;
+    return params;
+  }, [selectedCounty, selectedType, selectedStatus, fromDate, toDate, page]);
+
+  const buildExportParams = useCallback((): LeadsExportParams => {
+    const params: LeadsExportParams = {};
+    if (selectedCounty !== "all") params.county = selectedCounty;
+    if (selectedType !== "all") params.lead_type = selectedType;
+    if (selectedStatus !== "all") params.status = selectedStatus;
+    if (fromDate) params.from_date = fromDate;
+    if (toDate) params.to_date = toDate;
+    return params;
+  }, [selectedCounty, selectedType, selectedStatus, fromDate, toDate]);
+
+  const refreshLeads = useCallback(async () => {
     try {
-      setStats(await getLeadStats());
-    } catch {}
-  }, []);
+      await fetchLeads(buildListParams());
+    } catch (e) {
+      showApiErrorToast(e);
+    }
+  }, [buildListParams, fetchLeads]);
 
-  useEffect(() => { fetchLeads(); fetchStats(); }, [fetchLeads, fetchStats]);
+  const refreshStats = useCallback(async () => {
+    try {
+      await fetchStats();
+    } catch {}
+  }, [fetchStats]);
+
+  useEffect(() => { refreshLeads(); }, [refreshLeads]);
+  useEffect(() => { refreshStats(); }, [refreshStats]);
 
   useEffect(() => {
-    getScrapeStatus()
-      .then((data) => {
-        if (data.in_progress) {
-          setScraping(true);
-          setScrapeLog(data.log || ["Scrape in progress..."]);
-        }
-      })
-      .catch(() => {});
-  }, [setScrapeLog, setScraping]);
+    getScrapeStatus().then(applyScrapeStatus).catch(() => {});
+  }, [applyScrapeStatus]);
 
   useEffect(() => {
     if (!scraping) return;
-    const es = new EventSource(getScrapeStreamUrl());
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        setScrapeLog(data.log || []);
+
+    const unsubscribe = subscribeScrapeStream({
+      onEvent: (data) => {
+        setScrapeLog(data.log?.length ? data.log : ["Scrape in progress..."]);
+
         if (!data.in_progress) {
           setScraping(false);
-          fetchLeads();
+          refreshLeads();
           fetchStats();
-          es.close();
         }
-      } catch {}
-    };
-    es.onerror = () => {
-      setScraping(false);
-      fetchLeads();
-      fetchStats();
-      es.close();
-    };
-    return () => es.close();
-  }, [scraping, fetchLeads, fetchStats, setScrapeLog, setScraping]);
+      },
+      onError: () => {
+        setScraping(false);
+        refreshLeads();
+        fetchStats();
+      },
+    });
+
+    return unsubscribe;
+  }, [scraping, refreshLeads, fetchStats, setScrapeLog, setScraping]);
 
   const fetchRunHistory = useCallback(async () => {
     try {
       setRunHistory(await getScrapeRuns());
-    } catch {}
+    } catch (e) {
+      showApiErrorToast(e);
+    }
   }, [setRunHistory]);
 
   useEffect(() => { if (showRunHistory) fetchRunHistory(); }, [showRunHistory, fetchRunHistory]);
+
+  const handleCheckScrapeStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const data = await getScrapeStatus();
+      applyScrapeStatus(data);
+      showApiSuccessToast(data.in_progress ? "Scraper is currently running" : "Scraper is idle");
+      if (!data.in_progress) {
+        refreshLeads();
+        fetchStats();
+      }
+    } catch (e) {
+      showApiErrorToast(e);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   const handleTriggerScrape = async () => {
     setScraping(true);
     setScrapeLog(["Starting scrape..."]);
     try {
-      await triggerScrape({ from_date: fromDate, to_date: toDate });
+      const result = await triggerScrape({ from_date: fromDate, to_date: toDate });
+      const message = result.message?.trim() || "Scrape started";
+      showApiSuccessToast(message);
+      setScrapeLog([message]);
     } catch (e) {
-      console.error("Failed to trigger scrape:", e);
+      showApiErrorToast(e);
       setScraping(false);
     }
   };
@@ -181,12 +256,45 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
     }
   };
 
-  const handleUpdateStatus = async (id: string, status: LeadStatus) => {
+  const toggleExpandedLead = (leadId: string, notes: string | null) => {
+    setExpandedLead((current) => {
+      const next = current === leadId ? null : leadId;
+      if (next) {
+        setNotesDraft((prev) => ({
+          ...prev,
+          [leadId]: prev[leadId] ?? notes ?? "",
+        }));
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateStatus = async (id: string, status: LeadStatus, currentStatus?: LeadStatus) => {
+    if (currentStatus === status) return;
+
+    setUpdatingStatusId(id);
     try {
-      await updateLeadStatus(id, { status });
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+      await updateLead(id, { status });
+      updateLeadInList(id, { status });
+      showApiSuccessToast(`Status updated to ${STATUS_CONFIG[status].label}`);
     } catch (e) {
-      console.error("Failed to update lead status:", e);
+      showApiErrorToast(e);
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  const handleSaveNotes = async (id: string, status: LeadStatus) => {
+    const notes = (notesDraft[id] ?? "").trim();
+    setSavingNotesId(id);
+    try {
+      await updateLead(id, { status, notes });
+      updateLeadInList(id, { notes: notes || null });
+      showApiSuccessToast("Notes saved");
+    } catch (e) {
+      showApiErrorToast(e);
+    } finally {
+      setSavingNotesId(null);
     }
   };
 
@@ -194,25 +302,16 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
     setTracingIds((prev) => new Set(prev).add(id));
     try {
       const data = await skipTraceLead(id);
-      if (data.success) {
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === id
-              ? {
-                  ...l,
-                  skip_traced: true,
-                  st_phone: data.phone || l.st_phone,
-                  st_email: data.email || l.st_email,
-                  st_mailing: data.mailing || l.st_mailing,
-                }
-              : l,
-          ),
-        );
-      } else {
-        alert(data.error || "Skip trace failed — check your API key in Settings.");
-      }
-    } catch {
-      /* ignore */
+      const current = leads.find((l) => l.id === id);
+      updateLeadInList(id, {
+        skip_traced: true,
+        st_phone: data.phone ?? current?.st_phone ?? null,
+        st_email: data.email ?? current?.st_email ?? null,
+        st_mailing: data.mailing ?? current?.st_mailing ?? null,
+      });
+      showApiSuccessToast("Skip trace completed");
+    } catch (e) {
+      showApiErrorToast(e);
     } finally {
       setTracingIds((prev) => {
         const next = new Set(prev);
@@ -222,14 +321,54 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
     }
   };
 
-  const exportAll = () => {
-    window.open(buildLeadsExportUrl(), "_blank");
+  const handleExportCsv = async (params: LeadsExportParams) => {
+    setExporting(true);
     setShowExportMenu(false);
+    try {
+      const filename = await exportLeadsCsv(params);
+      showApiSuccessToast(`Downloaded ${filename}`);
+    } catch (e) {
+      showApiErrorToast(e);
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const exportFiltered = () => {
-    window.open(buildLeadsExportUrl(buildExportParams()), "_blank");
-    setShowExportMenu(false);
+  const handleOpenDeleteLeadsDialog = () => {
+    setDeleteCounty(selectedCounty !== "all" ? selectedCounty : "");
+    setDeleteSourceUrl("");
+    setDeleteOwnerNameContains(search.trim());
+    setShowDeleteLeadsDialog(true);
+  };
+
+  const hasDeleteLeadsFilter =
+    Boolean(deleteCounty.trim()) ||
+    Boolean(deleteSourceUrl.trim()) ||
+    Boolean(deleteOwnerNameContains.trim());
+
+  const handleDeleteLeads = async () => {
+    if (!hasDeleteLeadsFilter) return;
+
+    setDeletingLeads(true);
+    try {
+      const result = await deleteLeads({
+        county: deleteCounty.trim() || undefined,
+        source_url: deleteSourceUrl.trim() || undefined,
+        owner_name_contains: deleteOwnerNameContains.trim() || undefined,
+      });
+      const count = result.deleted;
+      showApiSuccessToast(
+        count === 1 ? "Permanently deleted 1 lead" : `Permanently deleted ${count} leads`,
+      );
+      setShowDeleteLeadsDialog(false);
+      setPage(0);
+      await refreshLeads();
+      await refreshStats();
+    } catch (e) {
+      showApiErrorToast(e);
+    } finally {
+      setDeletingLeads(false);
+    }
   };
 
   const filtered = leads.filter(l => {
@@ -243,58 +382,55 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
     );
   });
 
-  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  // Full hardcoded list so all lead types are always available as filter options,
-  // regardless of what has been scraped so far. Merge with any DB types not in this list.
-  const KNOWN_TYPES = [
-    "Bankruptcy",
-    "Code Violation",
-    "Divorce",
-    "Fire Damage",
-    "FSBO",
-    "Lis Pendens",
-    "Obituary",
-    "Pre-Foreclosure",
-    "Probate",
-    "Sheriff Sale",
-    "Tax Delinquent",
-    "Vacant/Abandoned",
-    "Water Shutoff",
-  ];
-  const dbTypes = stats ? stats.byType.map(t => t.lead_type) : leads.map(l => l.lead_type);
-  const allTypes = Array.from(new Set([...KNOWN_TYPES, ...dbTypes])).sort();
+  const totalPages = Math.max(1, Math.ceil(leadsTotal / PAGE_SIZE));
+  const dbTypes = stats ? stats.byType.map((t) => t.lead_type) : leads.map((l) => l.lead_type);
+  const allTypes = Array.from(new Set([...LEAD_TYPES, ...dbTypes])).sort();
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
-            County Scraper
-          </h1>
-          <p className="text-white/40 text-sm mt-1">Live motivated seller leads — updated daily at 6:00 AM.</p>
+    <div className="atlas-page-shell">
+      <div className="flex flex-col gap-4 lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="atlas-page-title">County Scraper</h1>
+          <p className="atlas-page-subtitle">Live motivated seller leads — updated daily at 6:00 AM.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-end gap-2 w-full lg:w-full">
           <button onClick={() => setShowHistorical(!showHistorical)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 border border-white/10 hover:border-white/20 transition-colors">
+            className="atlas-btn-ghost-sm col-span-1">
             <History className="w-3.5 h-3.5" />
             Historical Pull
           </button>
           <button onClick={() => setShowRunHistory(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 border border-white/10 hover:border-white/20 transition-colors">
+            className="atlas-btn-ghost-sm">
             <Database className="w-3.5 h-3.5" />
             Run History
           </button>
+          <button
+            onClick={handleCheckScrapeStatus}
+            disabled={checkingStatus}
+            className={`atlas-btn-ghost-sm border transition-colors disabled:opacity-50 ${
+              scraping ? "atlas-accent-active" : ""
+            }`}
+          >
+            <Activity className={`w-3.5 h-3.5 ${checkingStatus ? "animate-pulse" : ""}`} />
+            {checkingStatus ? "Checking..." : scraping ? "Running" : "Status"}
+          </button>
+          <button
+            onClick={handleOpenDeleteLeadsDialog}
+            className="atlas-btn-ghost-sm border border-red-500/20 text-red-400/90 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Leads
+          </button>
           <div className="relative">
-            <button onClick={() => setShowExportMenu(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 border border-white/10 hover:border-white/20 transition-colors">
-              <Download className="w-3.5 h-3.5" />
-              Export CSV
-              {showExportMenu ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            <button onClick={() => setShowExportMenu(v => !v)} disabled={exporting}
+              className="atlas-btn-ghost-sm w-full sm:w-auto">
+              {exporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {exporting ? "Exporting..." : "Export CSV"}
+              {!exporting && (showExportMenu ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
             </button>
-            {showExportMenu && (
+            {showExportMenu && !exporting && (
               <div className="absolute right-0 top-full mt-1 w-52 bg-[#13131f] border border-white/10 rounded-xl shadow-xl z-20 overflow-hidden">
-                <button onClick={exportAll}
+                <button onClick={() => handleExportCsv({})}
                   className="w-full flex items-center gap-2 px-4 py-3 text-xs text-white/70 hover:bg-white/5 hover:text-white transition-colors text-left">
                   <Download className="w-3.5 h-3.5 flex-shrink-0" />
                   <div>
@@ -303,20 +439,19 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
                   </div>
                 </button>
                 <div className="border-t border-white/[0.06]" />
-                <button onClick={exportFiltered}
+                <button onClick={() => handleExportCsv(buildExportParams())}
                   className="w-full flex items-center gap-2 px-4 py-3 text-xs text-white/70 hover:bg-white/5 hover:text-white transition-colors text-left">
                   <Filter className="w-3.5 h-3.5 flex-shrink-0" />
                   <div>
-                    <div className="font-semibold">Export Current View</div>
-                    <div className="text-white/35 text-[11px]">Filtered by county, type &amp; date</div>
+                    <div className="font-semibold">Export Current Filters</div>
+                    <div className="text-white/35 text-[11px]">County, type, status &amp; date range</div>
                   </div>
                 </button>
               </div>
             )}
           </div>
           <button onClick={handleTriggerScrape} disabled={scraping}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-50"
-            style={{ backgroundColor: accentColor }}>
+            className="atlas-btn atlas-btn-primary-glow col-span-2 sm:col-span-1 text-xs disabled:opacity-50">
             <RefreshCw className={`w-3.5 h-3.5 ${scraping ? "animate-spin" : ""}`} />
             {scraping ? "Scraping..." : "Run Now"}
           </button>
@@ -338,8 +473,7 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
               <span className="text-sm font-bold text-white w-8">{historicalDays}</span>
             </div>
             <button onClick={handleTriggerHistorical} disabled={scraping}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-              style={{ backgroundColor: accentColor }}>
+              className="atlas-btn disabled:opacity-50">
               Pull {historicalDays} Days
             </button>
           </div>
@@ -348,11 +482,11 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
 
       {showRunHistory && (
         <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-white/60" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <Database className="w-4 h-4 text-white/60 shrink-0" />
               <h3 className="text-sm font-semibold text-white">Scrape Run History</h3>
-              <span className="text-xs text-white/40">Last 200 runs across all counties and lead types</span>
+              <span className="text-xs text-white/40 hidden sm:inline">Last 200 runs across all counties and lead types</span>
             </div>
             <button onClick={fetchRunHistory} className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1">
               <RefreshCw className="w-3 h-3" /> Refresh
@@ -387,6 +521,7 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             run.status === 'success' ? 'bg-emerald-500/15 text-emerald-400' :
                             run.status === 'error' ? 'bg-red-500/15 text-red-400' :
+                            run.status === 'running' ? 'bg-blue-500/15 text-blue-400' :
                             'bg-amber-500/15 text-amber-400'
                           }`}>{run.status}</span>
                           {run.error && <span className="ml-2 text-red-400/60 truncate max-w-[200px] inline-block align-middle">{run.error}</span>}
@@ -417,7 +552,7 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
             { label: "Total Leads", value: stats.total.toLocaleString(), icon: Database },
             { label: "Added Today", value: stats.today.toLocaleString(), icon: Zap },
             { label: "Lead Types", value: stats.byType.length.toString(), icon: Filter },
-            { label: "Last Scrape", value: (() => { const t = stats.lastScrapeTime || stats.lastRun; if (!t) return 'Never'; const d = new Date(t + (t.includes('T') ? '' : 'T00:00:00')); return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); })(), icon: Clock },
+            { label: "Last Scrape", value: formatLastScrapeTime(getLastScrapeTimestamp(stats)), icon: Clock },
           ].map(({ label, value, icon: Icon }) => (
             <div key={label} className="bg-white/5 border border-white/10 rounded-xl p-4">
               <div className="flex items-center gap-2 text-white/40 text-xs mb-1"><Icon className="w-3.5 h-3.5" />{label}</div>
@@ -427,44 +562,72 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
         </div>
       )}
 
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-48">
+      <div className="bg-white/5 border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="relative w-full lg:flex-1 lg:min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
           <input type="text" placeholder="Search owner, address, case #..."
             value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
             className="w-full bg-transparent border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30" />
         </div>
-        <select value={selectedCounty} onChange={e => { setSelectedCounty(e.target.value); setPage(0); }}
-          className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="all">All Counties</option>
-          {counties.map(c => <option key={c.name} value={c.name}>{c.name}, {c.state}</option>)}
-        </select>
-        <select value={selectedType} onChange={e => { setSelectedType(e.target.value); setPage(0); }}
-          className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="all">All Types</option>
-          {allTypes.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={selectedStatus} onChange={e => { setSelectedStatus(e.target.value); setPage(0); }}
-          className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="all">All Statuses</option>
-          <option value="new">New</option>
-          <option value="reviewed">Reviewed</option>
-          <option value="contacted">Contacted</option>
-          <option value="skip">Skip</option>
-        </select>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-3.5 h-3.5 text-white/40" />
-          <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(0); }}
-            className="bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex lg:flex-nowrap gap-3 w-full lg:w-auto">
+          <AtlasSelect
+            value={selectedCounty}
+            onValueChange={(value) => { setSelectedCounty(value); setPage(0); }}
+            placeholder="All Counties"
+            className="w-full min-w-0 lg:min-w-[9.5rem] lg:max-w-[12rem]"
+            options={[
+              { value: "all", label: "All Counties" },
+              ...counties.map((c) => ({ value: c.name, label: `${c.name}, ${c.state}` })),
+            ]}
+          />
+          <AtlasSelect
+            value={selectedType}
+            onValueChange={(value) => { setSelectedType(value); setPage(0); }}
+            placeholder="All Types"
+            className="w-full min-w-0 lg:min-w-[9.5rem] lg:max-w-[12rem]"
+            options={[
+              { value: "all", label: "All Types" },
+              ...allTypes.map((t) => ({ value: t, label: t })),
+            ]}
+          />
+          <AtlasSelect
+            value={selectedStatus}
+            onValueChange={(value) => { setSelectedStatus(value); setPage(0); }}
+            placeholder="All Statuses"
+            className="w-full min-w-0 lg:min-w-[9.5rem] lg:max-w-[12rem]"
+            options={[
+              { value: "all", label: "All Statuses" },
+              ...LEAD_STATUSES.map((status) => ({
+                value: status,
+                label: STATUS_CONFIG[status].label,
+              })),
+            ]}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:shrink-0">
+          <AtlasDatePicker
+            value={fromDate}
+            onChange={(value) => { setFromDate(value); setPage(0); }}
+            className="flex-1 min-w-[8.5rem]"
+            max={toDate}
+          />
           <span className="text-white/30 text-xs">to</span>
-          <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(0); }}
-            className="bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+          <AtlasDatePicker
+            value={toDate}
+            onChange={(value) => { setToDate(value); setPage(0); }}
+            className="flex-1 min-w-[8.5rem]"
+            min={fromDate}
+          />
         </div>
       </div>
 
       <div className="flex items-center justify-between text-sm text-white/40">
-        <span>{filtered.length.toLocaleString()} leads{search ? ` matching "${search}"` : ""}</span>
-        {totalPages > 1 && (
+        <span>
+          {search
+            ? `${filtered.length.toLocaleString()} on this page matching "${search}"`
+            : `${leadsTotal.toLocaleString()} leads`}
+        </span>
+        {!search && totalPages > 1 && (
           <div className="flex items-center gap-2">
             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
               className="px-2 py-1 rounded border border-white/10 disabled:opacity-30 hover:border-white/20 text-xs">&larr;</button>
@@ -479,29 +642,34 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
         <div className="flex items-center justify-center py-20 text-white/30">
           <RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading leads...
         </div>
-      ) : filtered.length === 0 ? (
+      ) : leadsTotal === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-white/30 space-y-3">
           <Database className="w-10 h-10 opacity-30" />
           <p className="text-sm">No leads yet. Run a scrape or pull historical data to get started.</p>
           <div className="flex gap-2">
             <button onClick={handleTriggerScrape} disabled={scraping}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ backgroundColor: accentColor }}>Run Scrape Now</button>
+              className="atlas-btn">Run Scrape Now</button>
             <button onClick={() => setShowHistorical(true)}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white/60 border border-white/10">
               Pull Historical</button>
           </div>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-white/30 space-y-2">
+          <Search className="w-8 h-8 opacity-30" />
+          <p className="text-sm">No leads on this page match your search.</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {paginated.map(lead => (
+          {filtered.map(lead => (
             <div key={lead.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-white/20 transition-colors">
-              <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}>
-                <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 cursor-pointer" onClick={() => toggleExpandedLead(lead.id, lead.notes)}>
+                <div className="flex-1 min-w-0 w-full">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[lead.lead_type] || "bg-white/10 text-white/60"}`}>
                       {lead.lead_type}
                     </span>
+                    <SkipTraceBadge skipTraced={lead.skip_traced} compact />
                     <span className="text-xs text-white/40">{lead.county}, {lead.state}</span>
                     {lead.filing_date && (() => {
                       const daysAgo = lead.filing_date ? Math.floor((Date.now() - new Date(lead.filing_date).getTime()) / 86400000) : 999;
@@ -529,10 +697,19 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
                   </div>
                   {lead.case_number && <div className="text-xs text-white/25 mt-0.5 font-mono">Case #{lead.case_number}</div>}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[lead.status]?.className || STATUS_CONFIG.new.className}`}>
-                    {STATUS_CONFIG[lead.status]?.label || "New"}
-                  </span>
+                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto">
+                  <AtlasSelect
+                    value={lead.status}
+                    onValueChange={(status) => handleUpdateStatus(lead.id, status as LeadStatus, lead.status)}
+                    onTriggerClick={(e) => e.stopPropagation()}
+                    disabled={updatingStatusId === lead.id}
+                    size="sm"
+                    triggerClassName={`atlas-select-trigger--compact text-xs px-2 py-0.5 rounded-full font-medium border focus:outline-none cursor-pointer disabled:opacity-50 h-auto min-h-0 ${STATUS_CONFIG[lead.status]?.className || STATUS_CONFIG.new.className}`}
+                    options={LEAD_STATUSES.map((s) => ({
+                      value: s,
+                      label: STATUS_CONFIG[s].label,
+                    }))}
+                  />
                   <ChevronDown className={`w-4 h-4 text-white/30 transition-transform ${expandedLead === lead.id ? "rotate-180" : ""}`} />
                 </div>
               </div>
@@ -575,29 +752,66 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
                     <a href={lead.source_url} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-blue-400/70 hover:text-blue-400 hover:underline break-all">View Source Record &rarr;</a>
                   )}
-                  {/* Skip Trace Results */}
-                  {lead.skip_traced && (lead.st_phone || lead.st_email || lead.st_mailing) && (
-                    <div className="rounded-xl p-3 space-y-1.5" style={{background:"rgba(16,185,129,0.07)",border:"1px solid rgba(16,185,129,0.2)"}}>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-xs font-semibold text-emerald-400">Skip Traced</span>
-                      </div>
-                      {lead.st_phone && <div className="flex items-center gap-2 text-xs text-white/70"><Phone className="w-3 h-3 text-emerald-400/70" />{lead.st_phone}</div>}
-                      {lead.st_email && <div className="flex items-center gap-2 text-xs text-white/70"><Mail className="w-3 h-3 text-emerald-400/70" />{lead.st_email}</div>}
-                      {lead.st_mailing && <div className="flex items-center gap-2 text-xs text-white/70"><MapPin className="w-3 h-3 text-emerald-400/70" />{lead.st_mailing}</div>}
+                  <div className="space-y-2">
+                    <label className="text-xs text-white/30">Notes</label>
+                    <textarea
+                      value={notesDraft[lead.id] ?? lead.notes ?? ""}
+                      onChange={(e) => setNotesDraft((prev) => ({ ...prev, [lead.id]: e.target.value }))}
+                      onClick={(e) => e.stopPropagation()}
+                      rows={2}
+                      placeholder="Add notes about this lead..."
+                      className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-white/30 resize-y"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleSaveNotes(lead.id, lead.status); }}
+                      disabled={savingNotesId === lead.id}
+                      className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white/70 border border-white/10 hover:border-white/20 disabled:opacity-50"
+                    >
+                      {savingNotesId === lead.id ? "Saving..." : "Save Notes"}
+                    </button>
+                  </div>
+                  {/* Skip trace status — always visible when expanded */}
+                  <div
+                    className={`rounded-xl p-3 space-y-1.5 ${
+                      isSkipTraced(lead.skip_traced)
+                        ? "bg-emerald-500/10 border border-emerald-500/20"
+                        : "bg-white/[0.03] border border-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs text-white/30">Skip Trace</span>
+                      <SkipTraceBadge skipTraced={lead.skip_traced} />
                     </div>
-                  )}
+                    {isSkipTraced(lead.skip_traced) ? (
+                      lead.st_phone || lead.st_email || lead.st_mailing ? (
+                        <div className="space-y-1.5 pt-1">
+                          {lead.st_phone && <div className="flex items-center gap-2 text-xs text-white/70"><Phone className="w-3 h-3 text-emerald-400/70" />{lead.st_phone}</div>}
+                          {lead.st_email && <div className="flex items-center gap-2 text-xs text-white/70"><Mail className="w-3 h-3 text-emerald-400/70" />{lead.st_email}</div>}
+                          {lead.st_mailing && <div className="flex items-center gap-2 text-xs text-white/70"><MapPin className="w-3 h-3 text-emerald-400/70" />{lead.st_mailing}</div>}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-white/40 pt-1">Skip traced — no phone, email, or mailing address returned.</p>
+                      )
+                    ) : (
+                      <p className="text-xs text-white/40 pt-1">Not skip traced yet. Use the button below to run skip trace.</p>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-white/[0.06]">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-white/25">Status:</span>
-                      {(["new", "reviewed", "contacted", "skip"] as const).map(s => (
-                        <button key={s} onClick={() => handleUpdateStatus(lead.id, s)}
-                          className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${lead.status === s ? STATUS_CONFIG[s].className : "bg-white/5 text-white/40 border border-white/10 hover:border-white/20"}`}>
+                      {LEAD_STATUSES.map((s) => (
+                        <button
+                          key={s}
+                          onClick={(e) => { e.stopPropagation(); handleUpdateStatus(lead.id, s, lead.status); }}
+                          disabled={updatingStatusId === lead.id}
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all disabled:opacity-50 ${lead.status === s ? STATUS_CONFIG[s].className : "bg-white/5 text-white/40 border border-white/10 hover:border-white/20"}`}
+                        >
                           {STATUS_CONFIG[s].label}
                         </button>
                       ))}
                     </div>
-                    {!lead.skip_traced ? (
+                    {!isSkipTraced(lead.skip_traced) ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleSkipTrace(lead.id); }}
                         disabled={tracingIds.has(lead.id)}
@@ -619,7 +833,7 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
         </div>
       )}
 
-      {totalPages > 1 && (
+      {!search && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
             className="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-30 hover:border-white/20 text-sm text-white/60">&larr; Prev</button>
@@ -628,6 +842,71 @@ export default function CountyScraper({ counties, accentColor }: CountyScraperPr
             className="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-30 hover:border-white/20 text-sm text-white/60">Next &rarr;</button>
         </div>
       )}
+
+      <Dialog open={showDeleteLeadsDialog} onOpenChange={setShowDeleteLeadsDialog}>
+        <DialogContent className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete Leads</DialogTitle>
+            <DialogDescription className="text-white/45">
+              Permanently delete leads matching at least one filter. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-white/50">County</label>
+              <input
+                type="text"
+                value={deleteCounty}
+                onChange={(e) => setDeleteCounty(e.target.value)}
+                placeholder="e.g. Franklin"
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-white/50">Source URL</label>
+              <input
+                type="text"
+                value={deleteSourceUrl}
+                onChange={(e) => setDeleteSourceUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-white/50">Owner name contains</label>
+              <input
+                type="text"
+                value={deleteOwnerNameContains}
+                onChange={(e) => setDeleteOwnerNameContains(e.target.value)}
+                placeholder="Partial owner name"
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/20"
+              />
+            </div>
+            <p className="text-[11px] text-white/35">
+              Provide at least one filter. Matching leads are removed from the database permanently.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteLeadsDialog(false)}
+              disabled={deletingLeads}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 border border-white/10 hover:bg-white/[0.06] disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteLeads}
+              disabled={deletingLeads || !hasDeleteLeadsFilter}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-red-300 bg-red-500/15 border border-red-500/30 hover:bg-red-500/25 disabled:opacity-50 transition-colors"
+            >
+              {deletingLeads ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {deletingLeads ? "Deleting..." : "Delete Permanently"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

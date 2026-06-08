@@ -3,6 +3,13 @@ export interface ScrapeStatusResponse {
   log?: string[];
 }
 
+export interface ScrapeStatusApiResponse {
+  success: boolean;
+  message?: string;
+  data?: ScrapeStatusResponse;
+  requestId?: string;
+}
+
 export interface ScrapeStreamEvent {
   in_progress: boolean;
   log?: string[];
@@ -24,9 +31,30 @@ export interface ScrapeRunsResponse {
   runs: ScrapeRun[];
 }
 
+export interface ScrapeRunsApiResponse {
+  success: boolean;
+  message?: string;
+  data?: ScrapeRunsResponse;
+  requestId?: string;
+}
+
 export interface TriggerScrapePayload {
-  from_date?: string;
-  to_date?: string;
+  from_date: string;
+  to_date: string;
+}
+
+export interface TriggerScrapeData {
+  ok: boolean;
+  message?: string;
+  from_date: string;
+  to_date: string;
+}
+
+export interface TriggerScrapeApiResponse {
+  success: boolean;
+  message?: string;
+  data?: TriggerScrapeData;
+  requestId?: string;
 }
 
 export interface TriggerHistoricalScrapePayload {

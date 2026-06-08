@@ -1,14 +1,14 @@
-// Login page — premium split-screen design, branded per client
+// Signup page — matches Login split-screen design
 import { useState } from "react";
 import { Link } from "wouter";
 import { Eye, EyeOff, ArrowRight, MapPin, Brain, TrendingUp, Shield } from "lucide-react";
 import { APP_ROUTES } from "@/constants/appRoutes";
 import { getApiErrorMessage } from "@/lib/apiToast";
-import { login } from "@/services/authServices";
+import { signup } from "@/services/authServices";
 import { useAuthStore } from "@/store";
-import { loginSchema } from "@/validations";
+import { signupSchema } from "@/validations";
 
-interface LoginProps {
+interface SignupProps {
   companyName: string;
   accentColor: string;
 }
@@ -20,8 +20,9 @@ const FEATURE_ITEMS = [
   { icon: Shield, label: "Distress Signals", desc: "Social, obituary, and fire damage monitoring" },
 ];
 
-export default function Login({ companyName, accentColor }: LoginProps) {
+export default function Signup({ companyName, accentColor }: SignupProps) {
   const setCredentials = useAuthStore((s) => s.setCredentials);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -32,15 +33,15 @@ export default function Login({ companyName, accentColor }: LoginProps) {
     e.preventDefault();
     setError("");
 
-    const parsed = loginSchema.safeParse({ email, password });
+    const parsed = signupSchema.safeParse({ name, email, password });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid credentials.");
+      setError(parsed.error.issues[0]?.message ?? "Invalid signup details.");
       return;
     }
 
     setLoading(true);
     try {
-      const session = await login(parsed.data);
+      const session = await signup(parsed.data);
       setCredentials({
         user: session.user!,
         token: session.accessToken,
@@ -54,7 +55,6 @@ export default function Login({ companyName, accentColor }: LoginProps) {
 
   return (
     <div className="min-h-screen bg-[#080810] flex flex-col md:flex-row">
-      {/* Left panel */}
       <div className="relative hidden md:flex flex-col w-[52%] flex-shrink-0 overflow-hidden">
         <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #0d0d1a 0%, #0a0a14 60%, #0d0d1a 100%)" }} />
         <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(ellipse at 20% 40%, ${accentColor} 0%, transparent 55%)` }} />
@@ -92,7 +92,7 @@ export default function Login({ companyName, accentColor }: LoginProps) {
               built into one app.
             </h1>
             <p className="text-white/45 text-base leading-relaxed max-w-[380px]">
-              Atlas connects to county records, satellite imagery, and AI to surface motivated sellers in your market — every single day.
+              Create your account to access county scrapers, lead intelligence, and daily motivated seller data.
             </p>
           </div>
           <div className="space-y-4 mb-12">
@@ -115,7 +115,6 @@ export default function Login({ companyName, accentColor }: LoginProps) {
         </div>
       </div>
 
-      {/* Right panel */}
       <div className="flex-1 flex flex-col items-center justify-center px-8 py-12 md:px-16 bg-[#080810]">
         <div className="md:hidden flex items-center gap-3 mb-10 self-start">
           <div
@@ -132,10 +131,10 @@ export default function Login({ companyName, accentColor }: LoginProps) {
         <div className="w-full max-w-[380px]">
           <div className="mb-8">
             <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
-              Welcome back.
+              Create your account.
             </h2>
             <p className="text-white/40 text-sm">
-              I&apos;m Atlas &mdash;{" "}
+              Join Atlas &mdash;{" "}
               <span className="font-medium" style={{ color: accentColor }}>
                 your full-time data agent.
               </span>
@@ -144,7 +143,21 @@ export default function Login({ companyName, accentColor }: LoginProps) {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-white/50 text-[11px] font-bold uppercase tracking-[0.15em] mb-2">
-                Email / Username
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                required
+                autoComplete="name"
+                className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-white/50 text-[11px] font-bold uppercase tracking-[0.15em] mb-2">
+                Email
               </label>
               <input
                 type="email"
@@ -152,7 +165,7 @@ export default function Login({ companyName, accentColor }: LoginProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
-                autoComplete="username"
+                autoComplete="email"
                 className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all"
               />
             </div>
@@ -167,7 +180,7 @@ export default function Login({ companyName, accentColor }: LoginProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••"
                   required
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 pr-12 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all"
                 />
                 <button
@@ -178,6 +191,9 @@ export default function Login({ companyName, accentColor }: LoginProps) {
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <p className="mt-2 text-[11px] text-white/30">
+                At least 8 characters with uppercase, lowercase, number, and special character.
+              </p>
             </div>
             {error && (
               <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -194,20 +210,20 @@ export default function Login({ companyName, accentColor }: LoginProps) {
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  Access Atlas
+                  Create Account
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
           <p className="mt-6 text-center text-sm text-white/40">
-            Don&apos;t have an account?{" "}
+            Already have an account?{" "}
             <Link
-              href={APP_ROUTES.SIGNUP}
+              href={APP_ROUTES.LOGIN}
               className="font-semibold hover:underline"
               style={{ color: accentColor }}
             >
-              Sign up
+              Sign in
             </Link>
           </p>
           <div className="mt-8 pt-6 border-t border-white/[0.07]">

@@ -1,40 +1,22 @@
 import axios, { AxiosHeaders, type AxiosError, type AxiosResponse } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { APP_ROUTES } from "@/constants/appRoutes";
-import { getApiBaseUrl } from "@/lib/apiBaseUrl";
+import { getApiOrigin } from "@/lib/apiBaseUrl";
 import { isApiWithCredentialsEnabled } from "@/lib/apiClientEnv";
 import { END_POINT } from "@/lib/apiURL";
-import { parseAuthSessionFromPayload } from "@/services/apiShared";
-import { getAccessToken, getRefreshToken } from "@/utils/authStorage";
+import { getAccessToken } from "@/utils/authStorage";
 
-const baseURL = getApiBaseUrl();
+const baseURL = getApiOrigin();
 const REQUEST_TIMEOUT_MS = 30_000;
 
 if (import.meta.env.DEV && baseURL === "") {
-  console.warn("[Atlas] VITE_API_BASE_URL is empty — using same-origin /api paths (Vite dev proxy).");
+  console.warn("[Atlas] VITE_API_BASE_URL is empty — using same-origin paths (Vite dev proxy).");
 }
 
 declare module "axios" {
   export interface InternalAxiosRequestConfig {
     skipUnauthorizedRedirect?: boolean;
-    _retry?: boolean;
   }
-}
-
-type FailedQueueItem = {
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-};
-
-let isRefreshing = false;
-let failedQueue: FailedQueueItem[] = [];
-
-function processQueue(error: unknown | null = null, token: string | null = null) {
-  failedQueue.forEach(({ resolve, reject }) => {
-    if (error != null) reject(error);
-    else resolve(token);
-  });
-  failedQueue = [];
 }
 
 function resolvedRequestPath(config: InternalAxiosRequestConfig): string {
@@ -53,51 +35,11 @@ function isPublicAuthFailureUrl(pathOrUrl: string): boolean {
   );
 }
 
-function isRefreshRequest(pathOrUrl: string): boolean {
-  return pathOrUrl.includes(END_POINT.auth.refresh);
-}
-
 function redirectToLoginIfNeeded(): void {
   if (typeof window === "undefined") return;
   const pathname = window.location.pathname;
   if (pathname.startsWith(APP_ROUTES.LOGIN)) return;
   window.location.assign(APP_ROUTES.LOGIN);
-}
-
-function setBearerHeader(config: InternalAxiosRequestConfig, token: string): void {
-  const headers = AxiosHeaders.from(config.headers ?? {});
-  headers.set("Authorization", `Bearer ${token}`);
-  config.headers = headers;
-}
-
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) throw new Error("No refresh token available");
-
-  const url = `${baseURL.replace(/\/$/, "")}${END_POINT.auth.refresh}`;
-  const response = await axios.post(
-    url,
-    { refresh_token: refreshToken },
-    {
-      headers: { "Content-Type": "application/json" },
-      withCredentials: isApiWithCredentialsEnabled(),
-    },
-  );
-
-  const parsed = parseAuthSessionFromPayload(response.data, refreshToken);
-  if (!parsed) {
-    throw new Error("Invalid refresh token response");
-  }
-
-  const { useAuthStore } = await import("@/store/auth/authStore");
-  const applied = useAuthStore
-    .getState()
-    .applyRefreshedSession(parsed.accessToken, parsed.refreshToken, parsed.user ?? null);
-  if (!applied) {
-    throw new Error("Could not persist refreshed session");
-  }
-
-  return parsed.accessToken;
 }
 
 let unauthorizedPipeline: Promise<void> | null = null;
@@ -159,54 +101,13 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (isRefreshRequest(path)) {
-      try {
-        await clearSessionDueToUnauthorizedAndRedirect();
-      } catch {
-        redirectToLoginIfNeeded();
-      }
-      return Promise.reject(error);
-    }
-
-    if (originalRequest._retry) {
-      try {
-        await clearSessionDueToUnauthorizedAndRedirect();
-      } catch {
-        redirectToLoginIfNeeded();
-      }
-      return Promise.reject(error);
-    }
-
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        failedQueue.push({ resolve, reject });
-      })
-        .then((token) => {
-          setBearerHeader(originalRequest, token as string);
-          return axiosInstance(originalRequest);
-        })
-        .catch((err: unknown) => Promise.reject(err));
-    }
-
-    originalRequest._retry = true;
-    isRefreshing = true;
-
     try {
-      const newAccessToken = await refreshAccessToken();
-      setBearerHeader(originalRequest, newAccessToken);
-      processQueue(null, newAccessToken);
-      return axiosInstance(originalRequest);
-    } catch (refreshError: unknown) {
-      processQueue(refreshError, null);
-      try {
-        await clearSessionDueToUnauthorizedAndRedirect();
-      } catch {
-        redirectToLoginIfNeeded();
-      }
-      return Promise.reject(error);
-    } finally {
-      isRefreshing = false;
+      await clearSessionDueToUnauthorizedAndRedirect();
+    } catch {
+      redirectToLoginIfNeeded();
     }
+
+    return Promise.reject(error);
   },
 );
 
