@@ -26,7 +26,7 @@ cp .env.example .env   # then edit values as needed
 npm run dev
 ```
 
-The dev server starts at **http://localhost:5173** and proxies `/api` requests to the backend (`VITE_API_PROXY_TARGET`, default `http://localhost:3000`).
+The dev server starts at **http://localhost:5173** and proxies `/api` and `/auth` requests to the local backend (`http://localhost:3000` by default in `vite.config.ts`).
 
 ### Other scripts
 
@@ -62,7 +62,7 @@ Copy `.env.example` to `.env` and configure:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_API_PROXY_TARGET` | Dev only | Backend URL for Vite `/api` proxy (default: `http://localhost:3000`) |
+| `VITE_API_BASE_URL` | Production | Backend API root including version prefix (e.g. `https://host/api/v1`). Leave empty in dev to use Vite proxy. |
 | `VITE_OAUTH_PORTAL_URL` | Optional | OAuth portal base URL |
 | `VITE_APP_ID` | Optional | OAuth application ID |
 | `VITE_FRONTEND_FORGE_API_KEY` | Optional | Google Maps proxy API key |
@@ -81,7 +81,7 @@ This frontend expects a backend exposing routes such as:
 - `POST /api/scrape`, `GET /api/scrape/stream` (SSE)
 - And related endpoints used by `CountyScraper.tsx` and `Settings.tsx`
 
-Run the Atlas backend separately and ensure `VITE_API_PROXY_TARGET` points to it during local development.
+Run the Atlas backend separately on port 3000 (or update `DEV_PROXY_TARGET` in `vite.config.ts`) during local development.
 
 ## Migration note
 
