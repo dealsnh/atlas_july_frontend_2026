@@ -1,12 +1,12 @@
 import axios, { AxiosHeaders, type AxiosError, type AxiosResponse } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { APP_ROUTES } from "@/constants/appRoutes";
-import { getApiOrigin } from "@/lib/apiBaseUrl";
+import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { isApiWithCredentialsEnabled } from "@/lib/apiClientEnv";
 import { END_POINT } from "@/lib/apiURL";
 import { getAccessToken } from "@/utils/authStorage";
 
-const baseURL = getApiOrigin();
+const baseURL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 30_000;
 
 if (import.meta.env.DEV && baseURL === "") {
