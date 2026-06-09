@@ -62,7 +62,7 @@ Copy `.env.example` to `.env` and configure:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_API_BASE_URL` | Production | Backend API root including version prefix (e.g. `https://host/api/v1`). Leave empty in dev to use Vite proxy. |
+| `VITE_API_BASE_URL` | Optional | API root including version prefix (e.g. `https://host/api/v1`). Leave empty to use same-origin `/api/v1` — Vite proxy in dev, `vercel.json` rewrite in production. |
 | `VITE_OAUTH_PORTAL_URL` | Optional | OAuth portal base URL |
 | `VITE_APP_ID` | Optional | OAuth application ID |
 | `VITE_FRONTEND_FORGE_API_KEY` | Optional | Google Maps proxy API key |
@@ -74,14 +74,14 @@ Copy `.env.example` to `.env` and configure:
 
 ## API dependency
 
-This frontend expects a backend exposing routes such as:
+This frontend expects a backend exposing routes under `/api/v1/*`, for example:
 
-- `GET/POST /api/settings`
-- `GET /api/leads`, `GET /api/stats`
-- `POST /api/scrape`, `GET /api/scrape/stream` (SSE)
+- `GET/POST /api/v1/settings`
+- `GET /api/v1/leads`, `GET /api/v1/stats`
+- `POST /api/v1/scrape`, `GET /api/v1/scrape/stream` (SSE)
 - And related endpoints used by `CountyScraper.tsx` and `Settings.tsx`
 
-Run the Atlas backend separately on port 3000 (or update `DEV_PROXY_TARGET` in `vite.config.ts`) during local development.
+In production on Vercel, `/api/*` is proxied to the Railway backend via `vercel.json`. Locally, leave `VITE_API_BASE_URL` empty and run the Atlas backend on port 3000 (or update `DEV_PROXY_TARGET` in `vite.config.ts`).
 
 ## Migration note
 
