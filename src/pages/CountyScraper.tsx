@@ -1,12 +1,13 @@
 // County Scraper — full-stack live data version
 import { useState, useEffect, useCallback } from "react";
-import { MapPin, Clock, Download, RefreshCw, Filter, Search, ChevronDown, ChevronUp, Database, Zap, History, UserSearch, Phone, Mail, CheckCircle2, Activity, Trash2 } from "lucide-react";
+import { MapPin, Clock, Download, RefreshCw, Filter, Search, ChevronDown, ChevronUp, Database, Zap, History, UserSearch, Phone, Mail, CheckCircle2, Activity, Trash2, RotateCcw, Sparkles } from "lucide-react";
 import { AtlasDatePicker, AtlasSelect } from "@/components/atlas";
 import { LEAD_STATUSES, LEAD_TYPES } from "@/constants/leadFilters";
 import { formatLastScrapeTime, getLastScrapeTimestamp } from "@/lib/dateTimeFormat";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import {
   deleteLeads,
+  enrichLeads,
   exportLeadsCsv,
   skipTraceLead,
   updateLead,
@@ -29,7 +30,7 @@ import {
 import { useLeadsStore } from "@/store/leads/leadsStore";
 import { useScrapeStore } from "@/store/scrape/scrapeStore";
 import { useStatsStore } from "@/store/stats/statsStore";
-import type { LeadStatus, LeadsExportParams, LeadsListParams, ScrapeStatusResponse } from "@/types";
+import type { EnrichLeadsData, LeadStatus, LeadsExportParams, LeadsListParams, ScrapeStatusResponse } from "@/types";
 
 const STATUS_CONFIG = {
   new: { label: "New", className: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" },
@@ -83,6 +84,16 @@ interface CountyScraperProps {
   counties: Array<{ name: string; state: string; leadTypes: string[] }>;
 }
 
+function getScrapeDefaultFromDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().split("T")[0];
+}
+
+function getScrapeDefaultToDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function CountyScraper({ counties }: CountyScraperProps) {
   const leads = useLeadsStore((s) => s.leads);
   const leadsTotal = useLeadsStore((s) => s.total);
@@ -101,11 +112,8 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   const [selectedCounty, setSelectedCounty] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [fromDate, setFromDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    return d.toISOString().split("T")[0];
-  });
-  const [toDate, setToDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [search, setSearch] = useState("");
   const [showHistorical, setShowHistorical] = useState(false);
   const [historicalDays, setHistoricalDays] = useState(30);
@@ -117,7 +125,18 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showRunHistory, setShowRunHistory] = useState(false);
+  const [runHistoryExpanded, setRunHistoryExpanded] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [showScrapeDateDialog, setShowScrapeDateDialog] = useState(false);
+  const [showScrapeStartedDialog, setShowScrapeStartedDialog] = useState(false);
+  const [scrapeFromDate, setScrapeFromDate] = useState("");
+  const [scrapeToDate, setScrapeToDate] = useState("");
+  const [showEnrichDialog, setShowEnrichDialog] = useState(false);
+  const [showEnrichResultDialog, setShowEnrichResultDialog] = useState(false);
+  const [enrichCounty, setEnrichCounty] = useState("");
+  const [enrichLimit, setEnrichLimit] = useState(500);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<EnrichLeadsData | null>(null);
   const [showDeleteLeadsDialog, setShowDeleteLeadsDialog] = useState(false);
   const [deleteCounty, setDeleteCounty] = useState("");
   const [deleteSourceUrl, setDeleteSourceUrl] = useState("");
@@ -135,6 +154,24 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
       setScrapeLog([]);
     }
   }, [setScrapeLog, setScraping]);
+
+  const hasActiveFilters =
+    search !== "" ||
+    selectedCounty !== "all" ||
+    selectedType !== "all" ||
+    selectedStatus !== "all" ||
+    fromDate !== "" ||
+    toDate !== "";
+
+  const resetFilters = () => {
+    setSearch("");
+    setSelectedCounty("all");
+    setSelectedType("all");
+    setSelectedStatus("all");
+    setFromDate("");
+    setToDate("");
+    setPage(0);
+  };
 
   const buildListParams = useCallback((): LeadsListParams => {
     const params: LeadsListParams = {
@@ -230,14 +267,33 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     }
   };
 
+  const openScrapeDateDialog = () => {
+    setScrapeFromDate(fromDate || getScrapeDefaultFromDate());
+    setScrapeToDate(toDate || getScrapeDefaultToDate());
+    setShowScrapeDateDialog(true);
+  };
+
+  const scrapeDateRangeValid =
+    Boolean(scrapeFromDate) && Boolean(scrapeToDate) && scrapeFromDate <= scrapeToDate;
+
+  const handleScrapeDateDialogKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && scrapeDateRangeValid && !scraping) {
+      e.preventDefault();
+      void handleTriggerScrape();
+    }
+  };
+
   const handleTriggerScrape = async () => {
+    if (!scrapeDateRangeValid) return;
+
+    setShowScrapeDateDialog(false);
     setScraping(true);
-    setScrapeLog(["Starting scrape..."]);
+    setScrapeLog([`Starting scrape (${scrapeFromDate} → ${scrapeToDate})...`]);
     try {
-      const result = await triggerScrape({ from_date: fromDate, to_date: toDate });
+      const result = await triggerScrape({ from_date: scrapeFromDate, to_date: scrapeToDate });
       const message = result.message?.trim() || "Scrape started";
-      showApiSuccessToast(message);
       setScrapeLog([message]);
+      setShowScrapeStartedDialog(true);
     } catch (e) {
       showApiErrorToast(e);
       setScraping(false);
@@ -334,6 +390,37 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     }
   };
 
+  const enrichState = counties.find((c) => c.name === enrichCounty)?.state ?? "";
+  const enrichFormValid = Boolean(enrichCounty) && Boolean(enrichState) && enrichLimit > 0;
+
+  const openEnrichDialog = () => {
+    setEnrichCounty(selectedCounty !== "all" ? selectedCounty : "");
+    setEnrichLimit(500);
+    setShowEnrichDialog(true);
+  };
+
+  const handleEnrichLeads = async () => {
+    if (!enrichFormValid) return;
+
+    setEnriching(true);
+    try {
+      const result = await enrichLeads({
+        county: enrichCounty,
+        state: enrichState,
+        limit: enrichLimit,
+      });
+      setEnrichResult(result);
+      setShowEnrichDialog(false);
+      setShowEnrichResultDialog(true);
+      await refreshLeads();
+      await refreshStats();
+    } catch (e) {
+      showApiErrorToast(e);
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   const handleOpenDeleteLeadsDialog = () => {
     setDeleteCounty(selectedCounty !== "all" ? selectedCounty : "");
     setDeleteSourceUrl("");
@@ -399,10 +486,23 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             <History className="w-3.5 h-3.5" />
             Historical Pull
           </button>
-          <button onClick={() => setShowRunHistory(v => !v)}
-            className="atlas-btn-ghost-sm">
+          <button
+            onClick={() => {
+              setShowRunHistory((v) => {
+                const next = !v;
+                if (next) setRunHistoryExpanded(true);
+                return next;
+              });
+            }}
+            className="atlas-btn-ghost-sm"
+          >
             <Database className="w-3.5 h-3.5" />
             Run History
+            {showRunHistory ? (
+              <ChevronUp className="w-3.5 h-3.5 text-white/40" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-white/40" />
+            )}
           </button>
           <button
             onClick={handleCheckScrapeStatus}
@@ -450,10 +550,19 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
               </div>
             )}
           </div>
-          <button onClick={handleTriggerScrape} disabled={scraping}
+          <button
+            type="button"
+            onClick={openEnrichDialog}
+            disabled={enriching}
+            className="atlas-btn-ghost-sm col-span-2 sm:col-span-1 text-xs disabled:opacity-50"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${enriching ? "animate-pulse" : ""}`} />
+            {enriching ? "Enriching..." : "Enrich Leads"}
+          </button>
+          <button onClick={openScrapeDateDialog} disabled={scraping}
             className="atlas-btn atlas-btn-primary-glow col-span-2 sm:col-span-1 text-xs disabled:opacity-50">
             <RefreshCw className={`w-3.5 h-3.5 ${scraping ? "animate-spin" : ""}`} />
-            {scraping ? "Scraping..." : "Run Now"}
+            {scraping ? "Scraping..." : "Run Scrape"}
           </button>
         </div>
       </div>
@@ -483,16 +592,28 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
       {showRunHistory && (
         <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => setRunHistoryExpanded((v) => !v)}
+              className="flex flex-wrap items-center gap-2 min-w-0 text-left hover:opacity-90 transition-opacity"
+              aria-expanded={runHistoryExpanded}
+            >
+              {runHistoryExpanded ? (
+                <ChevronUp className="w-4 h-4 text-white/50 shrink-0" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-white/50 shrink-0" />
+              )}
               <Database className="w-4 h-4 text-white/60 shrink-0" />
               <h3 className="text-sm font-semibold text-white">Scrape Run History</h3>
               <span className="text-xs text-white/40 hidden sm:inline">Last 200 runs across all counties and lead types</span>
-            </div>
-            <button onClick={fetchRunHistory} className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> Refresh
             </button>
+            {runHistoryExpanded && (
+              <button onClick={fetchRunHistory} className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1 shrink-0">
+                <RefreshCw className="w-3 h-3" /> Refresh
+              </button>
+            )}
           </div>
-          {runHistory.length === 0 ? (
+          {runHistoryExpanded && (runHistory.length === 0 ? (
             <div className="text-xs text-white/30 text-center py-6">No scrape runs recorded yet. Run a scrape to see history here.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -532,7 +653,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                 </tbody>
               </table>
             </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -609,15 +730,27 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             value={fromDate}
             onChange={(value) => { setFromDate(value); setPage(0); }}
             className="flex-1 min-w-[8.5rem]"
-            max={toDate}
+            placeholder="Select date"
+            max={toDate || undefined}
           />
           <span className="text-white/30 text-xs">to</span>
           <AtlasDatePicker
             value={toDate}
             onChange={(value) => { setToDate(value); setPage(0); }}
             className="flex-1 min-w-[8.5rem]"
-            min={fromDate}
+            placeholder="Select date"
+            min={fromDate || undefined}
           />
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={!hasActiveFilters}
+            title="Reset all filters"
+            className="atlas-btn-ghost-sm border border-white/10 disabled:opacity-40 disabled:pointer-events-none shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset
+          </button>
         </div>
       </div>
 
@@ -647,7 +780,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
           <Database className="w-10 h-10 opacity-30" />
           <p className="text-sm">No leads yet. Run a scrape or pull historical data to get started.</p>
           <div className="flex gap-2">
-            <button onClick={handleTriggerScrape} disabled={scraping}
+            <button onClick={openScrapeDateDialog} disabled={scraping}
               className="atlas-btn">Run Scrape Now</button>
             <button onClick={() => setShowHistorical(true)}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white/60 border border-white/10">
@@ -842,6 +975,205 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             className="px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-30 hover:border-white/20 text-sm text-white/60">Next &rarr;</button>
         </div>
       )}
+
+      <Dialog open={showEnrichDialog} onOpenChange={setShowEnrichDialog}>
+        <DialogContent className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Enrich Leads</DialogTitle>
+            <DialogDescription className="text-white/45">
+              Backfill missing owner data for leads in a county. Select a county and how many records to process.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-white/50">County</label>
+              <AtlasSelect
+                value={enrichCounty}
+                onValueChange={setEnrichCounty}
+                placeholder="Select county"
+                className="w-full"
+                options={counties.map((c) => ({
+                  value: c.name,
+                  label: `${c.name}, ${c.state}`,
+                }))}
+              />
+            </div>
+            {enrichState && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-white/50">State</label>
+                <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white/70">
+                  {enrichState}
+                </div>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-white/50">Limit</label>
+              <input
+                type="number"
+                min={1}
+                max={5000}
+                value={enrichLimit}
+                onChange={(e) => setEnrichLimit(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/20"
+              />
+              <p className="text-[11px] text-white/35">Maximum number of leads to process in this run.</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEnrichDialog(false)}
+              disabled={enriching}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 border border-white/10 hover:bg-white/[0.06] disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleEnrichLeads}
+              disabled={enriching || !enrichFormValid}
+              className="atlas-btn atlas-btn-primary-glow text-sm disabled:opacity-50"
+            >
+              <Sparkles className={`w-4 h-4 ${enriching ? "animate-pulse" : ""}`} />
+              {enriching ? "Enriching..." : "Start Enrichment"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEnrichResultDialog} onOpenChange={setShowEnrichResultDialog}>
+        <DialogContent className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/25">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              </div>
+              <DialogTitle className="text-white">Enrichment complete</DialogTitle>
+            </div>
+            <DialogDescription className="text-white/55 text-sm leading-relaxed">
+              {enrichCounty && enrichState
+                ? `Results for ${enrichCounty}, ${enrichState}:`
+                : "Enrichment finished with the following results:"}
+            </DialogDescription>
+          </DialogHeader>
+          {enrichResult && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-white/5 border border-white/10 p-3 text-center">
+                <div className="text-lg font-bold text-white">{enrichResult.processed}</div>
+                <div className="text-[11px] text-white/40 mt-0.5">Processed</div>
+              </div>
+              <div className="rounded-lg bg-white/5 border border-white/10 p-3 text-center">
+                <div className="text-lg font-bold text-emerald-400">{enrichResult.updated}</div>
+                <div className="text-[11px] text-white/40 mt-0.5">Updated</div>
+              </div>
+              <div className="rounded-lg bg-white/5 border border-white/10 p-3 text-center">
+                <div className="text-lg font-bold text-amber-400">{enrichResult.stillMissingOwner}</div>
+                <div className="text-[11px] text-white/40 mt-0.5">Still missing</div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setShowEnrichResultDialog(false)}
+              className="atlas-btn atlas-btn-primary-glow w-full sm:w-auto text-sm"
+            >
+              Got it
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showScrapeDateDialog} onOpenChange={setShowScrapeDateDialog}>
+        <DialogContent
+          className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md"
+          onKeyDown={handleScrapeDateDialogKeyDown}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-white">Run Scrape</DialogTitle>
+            <DialogDescription className="text-white/45">
+              Choose the date range to scrape. Only records within this window will be pulled.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex-1 min-w-[8.5rem] space-y-1.5">
+                <label className="text-xs font-medium text-white/50">From</label>
+                <AtlasDatePicker
+                  value={scrapeFromDate}
+                  onChange={setScrapeFromDate}
+                  className="w-full"
+                  max={scrapeToDate || undefined}
+                />
+              </div>
+              <span className="text-white/30 text-xs pt-5">to</span>
+              <div className="flex-1 min-w-[8.5rem] space-y-1.5">
+                <label className="text-xs font-medium text-white/50">To</label>
+                <AtlasDatePicker
+                  value={scrapeToDate}
+                  onChange={setScrapeToDate}
+                  className="w-full"
+                  min={scrapeFromDate || undefined}
+                />
+              </div>
+            </div>
+            {!scrapeDateRangeValid && scrapeFromDate && scrapeToDate && (
+              <p className="text-[11px] text-red-400/90">From date must be on or before the to date.</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setShowScrapeDateDialog(false)}
+              disabled={scraping}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 border border-white/10 hover:bg-white/[0.06] disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleTriggerScrape}
+              disabled={scraping || !scrapeDateRangeValid}
+              className="atlas-btn atlas-btn-primary-glow text-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${scraping ? "animate-spin" : ""}`} />
+              {scraping ? "Starting..." : "Start Scrape"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showScrapeStartedDialog} onOpenChange={setShowScrapeStartedDialog}>
+        <DialogContent className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/25">
+                <Clock className="h-5 w-5 text-emerald-400" />
+              </div>
+              <DialogTitle className="text-white">Scrape is on its way</DialogTitle>
+            </div>
+            <DialogDescription className="text-white/55 text-sm leading-relaxed">
+              We&apos;re pulling leads from{" "}
+              <span className="text-white/80 font-medium">{scrapeFromDate}</span> to{" "}
+              <span className="text-white/80 font-medium">{scrapeToDate}</span>.
+              {" "}This usually takes about <span className="text-white/80 font-medium">30 minutes</span> to finish.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-white/45 leading-relaxed">
+            You can stay on this page and watch the live log, or come back later — new leads will show up
+            automatically when the run completes.
+          </p>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setShowScrapeStartedDialog(false)}
+              className="atlas-btn atlas-btn-primary-glow w-full sm:w-auto text-sm"
+            >
+              Got it
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDeleteLeadsDialog} onOpenChange={setShowDeleteLeadsDialog}>
         <DialogContent className="bg-[#0c0c18] border-white/10 text-white sm:max-w-md">

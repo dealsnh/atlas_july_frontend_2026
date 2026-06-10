@@ -29,6 +29,9 @@ export type {
   DeleteLeadsPayload,
   DeleteLeadsData,
   DeleteLeadsApiResponse,
+  EnrichLeadsPayload,
+  EnrichLeadsData,
+  EnrichLeadsApiResponse,
 } from "./leads";
 
 export type {

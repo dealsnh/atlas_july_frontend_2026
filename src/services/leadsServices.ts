@@ -10,6 +10,9 @@ import type {
   DeleteLeadsApiResponse,
   DeleteLeadsData,
   DeleteLeadsPayload,
+  EnrichLeadsApiResponse,
+  EnrichLeadsData,
+  EnrichLeadsPayload,
   LeadStats,
   LeadStatsApiResponse,
   LeadsExportParams,
@@ -219,6 +222,34 @@ export async function deleteLeads(payload: DeleteLeadsPayload) {
     body,
   );
   return extractDeleteLeadsResponse(data);
+}
+
+function extractEnrichLeadsResponse(payload: unknown): EnrichLeadsData {
+  if (payload && typeof payload === "object" && "success" in payload) {
+    const envelope = payload as EnrichLeadsApiResponse;
+    assertApiSuccess(envelope, "Failed to enrich leads");
+    if (!envelope.data) {
+      throw new Error(getMessageFromApiPayload(payload) || "Failed to enrich leads");
+    }
+    return envelope.data;
+  }
+
+  const next = unwrapData(payload as ApiData<EnrichLeadsData>);
+  if (next && typeof next === "object" && "processed" in next) {
+    return next as EnrichLeadsData;
+  }
+
+  return payload as EnrichLeadsData;
+}
+
+/** Enrich leads for a county (owner data backfill). */
+export async function enrichLeads(payload: EnrichLeadsPayload): Promise<EnrichLeadsData> {
+  const data = await apiInvoker<EnrichLeadsApiResponse | ApiData<EnrichLeadsData>>(
+    END_POINT.admin.enrich,
+    "POST",
+    payload,
+  );
+  return extractEnrichLeadsResponse(data);
 }
 
 /** Download leads as CSV from GET /api/v1/leads/export. */

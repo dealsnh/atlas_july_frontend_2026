@@ -155,3 +155,23 @@ export interface DeleteLeadsApiResponse {
   message?: string;
   requestId?: string;
 }
+
+export interface EnrichLeadsPayload {
+  county: string;
+  state: string;
+  limit: number;
+}
+
+export interface EnrichLeadsData {
+  ok: boolean;
+  processed: number;
+  updated: number;
+  stillMissingOwner: number;
+}
+
+export interface EnrichLeadsApiResponse {
+  success: boolean;
+  data: EnrichLeadsData;
+  message?: string;
+  requestId?: string;
+}

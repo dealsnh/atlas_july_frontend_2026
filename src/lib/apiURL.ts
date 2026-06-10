@@ -30,5 +30,6 @@ export const END_POINT = {
   },
   admin: {
     deleteLeads: "/admin/leads",
+    enrich: "/admin/enrich",
   },
 } as const;
