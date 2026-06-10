@@ -1,12 +1,15 @@
 // Signup page — matches Login split-screen design
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "wouter";
 import { Eye, EyeOff, ArrowRight, MapPin, Brain, TrendingUp, Shield } from "lucide-react";
 import { APP_ROUTES } from "@/constants/appRoutes";
 import { getApiErrorMessage } from "@/lib/apiToast";
+import { cn } from "@/lib/utils";
 import { signup } from "@/services/authServices";
 import { useAuthStore } from "@/store";
-import { signupSchema } from "@/validations";
+import { signupSchema, type SignupFormValues } from "@/validations";
 
 interface SignupProps {
   companyName: string;
@@ -20,38 +23,41 @@ const FEATURE_ITEMS = [
   { icon: Shield, label: "Distress Signals", desc: "Social, obituary, and fire damage monitoring" },
 ];
 
+const inputClassName =
+  "w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all";
+
 export default function Signup({ companyName, accentColor }: SignupProps) {
   const setCredentials = useAuthStore((s) => s.setCredentials);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState("");
+  const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { name: "", email: "", password: "" },
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
 
-    const parsed = signupSchema.safeParse({ name, email, password });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid signup details.");
-      return;
-    }
-
+  const onSubmit = handleSubmit(async (data) => {
+    setApiError("");
     setLoading(true);
     try {
-      const session = await signup(parsed.data);
+      const session = await signup(data);
       setCredentials({
         user: session.user!,
         token: session.accessToken,
         refreshToken: session.refreshToken || undefined,
       });
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      setApiError(getApiErrorMessage(err));
       setLoading(false);
     }
-  };
+  });
 
   return (
     <div className="min-h-screen bg-[#080810] flex flex-col md:flex-row">
@@ -140,20 +146,22 @@ export default function Signup({ companyName, accentColor }: SignupProps) {
               </span>
             </p>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={onSubmit} noValidate className="space-y-5">
             <div>
               <label className="block text-white/50 text-[11px] font-bold uppercase tracking-[0.15em] mb-2">
                 Full Name
               </label>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
-                required
                 autoComplete="name"
-                className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all"
+                aria-invalid={!!errors.name}
+                className={cn(inputClassName, errors.name && "border-red-500/40 focus:border-red-500/50")}
+                {...register("name")}
               />
+              {errors.name && (
+                <p className="mt-1.5 text-xs text-red-400">{errors.name.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-white/50 text-[11px] font-bold uppercase tracking-[0.15em] mb-2">
@@ -161,13 +169,15 @@ export default function Signup({ companyName, accentColor }: SignupProps) {
               </label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                required
                 autoComplete="email"
-                className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all"
+                aria-invalid={!!errors.email}
+                className={cn(inputClassName, errors.email && "border-red-500/40 focus:border-red-500/50")}
+                {...register("email")}
               />
+              {errors.email && (
+                <p className="mt-1.5 text-xs text-red-400">{errors.email.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-white/50 text-[11px] font-bold uppercase tracking-[0.15em] mb-2">
@@ -176,28 +186,31 @@ export default function Signup({ companyName, accentColor }: SignupProps) {
               <div className="relative">
                 <input
                   type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••"
-                  required
                   autoComplete="new-password"
-                  className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl px-4 py-3.5 pr-12 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-all"
+                  aria-invalid={!!errors.password}
+                  className={cn(inputClassName, "pr-12", errors.password && "border-red-500/40 focus:border-red-500/50")}
+                  {...register("password")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white transition-colors"
                 >
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-white/30">
-                At least 8 characters with uppercase, lowercase, number, and special character.
-              </p>
+              {errors.password ? (
+                <p className="mt-1.5 text-xs text-red-400">{errors.password.message}</p>
+              ) : (
+                <p className="mt-2 text-[11px] text-white/30">
+                  At least 8 characters with uppercase, lowercase, number, and special character.
+                </p>
+              )}
             </div>
-            {error && (
+            {apiError && (
               <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                {error}
+                {apiError}
               </div>
             )}
             <button

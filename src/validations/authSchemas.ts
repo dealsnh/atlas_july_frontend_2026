@@ -19,9 +19,12 @@ const hasValidEmailDomain = (email: string): boolean => {
     return false;
   }
 
-  return labels.every((label) => label.length <= 63 && HOSTNAME_LABEL_RE.test(label));
+  return labels.every(
+    (label) => label.length <= 63 && HOSTNAME_LABEL_RE.test(label),
+  );
 };
 
+/** Email: valid format, 5–254 chars, trimmed and lowercased on parse. */
 export const emailSchema = z
   .string()
   .trim()
@@ -33,8 +36,10 @@ export const emailSchema = z
     message: "Please provide a valid email address",
   });
 
+/** Login: password presence only (no complexity rules). */
 const passwordRequiredSchema = z.string().min(1, "Password is required");
 
+/** Strong password: signup + set/reset/update-password flows. */
 export const strongPasswordSchema = z
   .string()
   .trim()
@@ -45,6 +50,43 @@ export const strongPasswordSchema = z
   .regex(/\d/, "Password must contain uppercase, lowercase, number and special character")
   .regex(/[^A-Za-z0-9]/, "Password must contain uppercase, lowercase, number and special character");
 
+export const SIGNUP_NAME_MAX_LENGTH = 100;
+
+/** Full name: letters and spaces only; trimmed for API. */
+export const signupNameSchema = z
+  .string()
+  .superRefine((val, ctx) => {
+    if (!/^[a-zA-Z\s]*$/.test(val)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Name can only contain alphabets.",
+      });
+      return;
+    }
+    const t = val.trim();
+    if (t.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Name is required.",
+      });
+      return;
+    }
+    if (t.length > SIGNUP_NAME_MAX_LENGTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Name is too long. Maximum ${SIGNUP_NAME_MAX_LENGTH} characters allowed.`,
+      });
+      return;
+    }
+    if (!/^[a-zA-Z]+(?:\s+[a-zA-Z]+)*$/.test(t)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Name can only contain alphabets.",
+      });
+    }
+  })
+  .transform((s) => s.trim());
+
 export const loginSchema = z.object({
   email: emailSchema,
   password: passwordRequiredSchema,
@@ -53,11 +95,7 @@ export const loginSchema = z.object({
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const signupSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name is required")
-    .max(100, "Name must be less than 100 characters"),
+  name: signupNameSchema,
   email: emailSchema,
   password: strongPasswordSchema,
 });

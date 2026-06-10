@@ -7,7 +7,10 @@
  * 4. Email Delivery — SMTP + recipient list
  */
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { cn } from "@/lib/utils";
 import { formatLastScrapeTime } from "@/lib/dateTimeFormat";
 import { prepareSettingsSavePayload } from "@/services/settingsServices";
 import {
@@ -19,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSettingsStore, useStatsStore, settingsToFormValues } from "@/store";
-import { settingsSaveSchema, testEmailSchema } from "@/validations";
+import { settingsSaveSchema, testEmailSchema, type SettingsSaveFormValues, type TestEmailFormValues } from "@/validations";
 import {
   CheckCircle, XCircle, AlertCircle, Clock,
   ChevronDown, ChevronRight, Save, Eye, EyeOff,
@@ -309,34 +312,51 @@ function Step({ n, label, children }: { n: string | number; label: string; child
   );
 }
 
-function InputField({ label, value, onChange, placeholder, hint, masked }: {
+function InputField({
+  label,
+  hint,
+  masked,
+  error,
+  className,
+  ...inputProps
+}: {
   label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
   hint?: string;
   masked?: boolean;
-}) {
+  error?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
   const [show, setShow] = useState(false);
+  const inputType = masked && !show ? "password" : (inputProps.type ?? "text");
+
   return (
     <div>
       <label className="block text-sm font-medium text-white/60 mb-1.5">{label}</label>
       <div className="relative">
         <input
-          type={masked && !show ? "password" : "text"}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-colors"
+          {...inputProps}
+          type={inputType}
+          aria-invalid={!!error}
+          className={cn(
+            "w-full bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/25 focus:bg-white/[0.06] transition-colors",
+            error && "border-red-500/40 focus:border-red-500/50",
+            className,
+          )}
         />
         {masked && (
-          <button type="button" onClick={() => setShow(!show)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70">
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70"
+          >
             {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         )}
       </div>
-      {hint && <p className="mt-1 text-xs text-white/35">{hint}</p>}
+      {error ? (
+        <p className="mt-1.5 text-xs text-red-400">{error}</p>
+      ) : hint ? (
+        <p className="mt-1 text-xs text-white/35">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -353,72 +373,90 @@ export default function Settings() {
   const statsLoading = useStatsStore((s) => s.isLoading);
   const fetchStats = useStatsStore((s) => s.fetchStats);
 
-  const [form, setForm] = useState<Record<string, string>>({});
   const [expandedCounty, setExpandedCounty] = useState<string | null>(null);
   const [showEndpoints, setShowEndpoints] = useState(false);
   const [showTestEmailDialog, setShowTestEmailDialog] = useState(false);
-  const [testEmailAddress, setTestEmailAddress] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = useForm<SettingsSaveFormValues>({
+    resolver: zodResolver(settingsSaveSchema),
+    defaultValues: {
+      smtp_host: "",
+      smtp_port: "587",
+      smtp_user: "",
+      smtp_pass: "",
+      smtp_from: "",
+      email_recipients: "",
+      auto_skip_trace: "false",
+      bright_data_user: "",
+      bright_data_pass: "",
+      scraper_api_key: "",
+      skip_trace_key: "",
+      attom_api_key: "",
+    },
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
+
+  const {
+    register: registerTestEmail,
+    handleSubmit: handleTestEmailSubmit,
+    reset: resetTestEmail,
+    formState: { errors: testEmailErrors },
+  } = useForm<TestEmailFormValues>({
+    resolver: zodResolver(testEmailSchema),
+    defaultValues: { email: "" },
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
+
+  const autoSkipTrace = watch("auto_skip_trace");
 
   useEffect(() => {
     fetchSettings()
-      .then((data) => setForm(settingsToFormValues(data)))
+      .then((data) => reset(settingsToFormValues(data) as SettingsSaveFormValues))
       .catch((e) => showApiErrorToast(e));
-  }, [fetchSettings]);
+  }, [fetchSettings, reset]);
 
   useEffect(() => {
     fetchStats().catch((e) => showApiErrorToast(e));
   }, [fetchStats]);
 
-  const set = (key: string) => (value: string) =>
-    setForm(prev => ({ ...prev, [key]: value }));
-
-  const handleSave = async () => {
+  const handleSave = handleSubmit(async (parsed) => {
     if (!settings) return;
 
     try {
-      const payload: Record<string, string> = {};
-      for (const [k, v] of Object.entries(form)) {
-        if (v !== undefined) payload[k] = v;
-      }
-
-      const parsed = settingsSaveSchema.safeParse(payload);
-      if (!parsed.success) {
-        const firstIssue = parsed.error.issues[0]?.message ?? "Invalid settings";
-        showApiErrorToast(firstIssue);
-        return;
-      }
-
       const { settings: updated, message } = await saveSettings(
-        prepareSettingsSavePayload(parsed.data, settings),
+        prepareSettingsSavePayload(parsed, settings),
       );
-      setForm(settingsToFormValues(updated));
+      reset(settingsToFormValues(updated) as SettingsSaveFormValues);
       showApiSuccessToast(message ?? "Settings saved successfully");
     } catch (e) {
       showApiErrorToast(e);
     }
-  };
+  });
 
   const handleOpenTestEmailDialog = () => {
-    setTestEmailAddress("");
+    resetTestEmail({ email: "" });
     setShowTestEmailDialog(true);
   };
 
-  const handleTestEmail = async () => {
+  const handleTestEmail = handleTestEmailSubmit(async (data) => {
     try {
-      const parsed = testEmailSchema.safeParse({ email: testEmailAddress.trim() });
-      if (!parsed.success) {
-        const firstIssue = parsed.error.issues[0]?.message ?? "Invalid email address";
-        showApiErrorToast(firstIssue);
-        return;
-      }
-
-      const { message } = await testEmail(parsed.data);
+      const { message } = await testEmail(data);
       showApiSuccessToast(message ?? "Test email sent successfully");
       setShowTestEmailDialog(false);
     } catch (e: unknown) {
       showApiErrorToast(e);
     }
-  };
+  });
 
   if (isLoading || !settings) {
     return (
@@ -933,17 +971,17 @@ I need you to: [describe what you want]`}</CodeBlock>
             <div className="grid md:grid-cols-2 gap-3">
               <InputField
                 label="Bright Data Username"
-                value={form.bright_data_user || ""}
-                onChange={set("bright_data_user")}
                 placeholder="brd-customer-xxxxxx-zone-xxxxx"
                 hint="From Bright Data dashboard → Proxies → Residential → Access parameters"
+                error={errors.bright_data_user?.message}
+                {...register("bright_data_user")}
               />
               <InputField
                 label="Bright Data Password"
-                value={form.bright_data_pass || ""}
-                onChange={set("bright_data_pass")}
                 placeholder="Your zone password"
                 masked
+                error={errors.bright_data_pass?.message}
+                {...register("bright_data_pass")}
               />
             </div>
           </div>
@@ -963,11 +1001,11 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
             <InputField
               label="ATTOM API Key"
-              value={form.attom_api_key || ""}
-              onChange={set("attom_api_key")}
               placeholder="Your ATTOM API key"
               masked
               hint="From api.gateway.attomdata.com → Account → API Keys"
+              error={errors.attom_api_key?.message}
+              {...register("attom_api_key")}
             />
           </div>
 
@@ -986,11 +1024,11 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
             <InputField
               label="ScraperAPI Key"
-              value={form.scraper_api_key || ""}
-              onChange={set("scraper_api_key")}
               placeholder="Your ScraperAPI key"
               masked
               hint="From scraperapi.com → Dashboard → API Key"
+              error={errors.scraper_api_key?.message}
+              {...register("scraper_api_key")}
             />
           </div>
 
@@ -1011,26 +1049,31 @@ I need you to: [describe what you want]`}</CodeBlock>
             </div>
             <InputField
               label="Easy Button Skip Trace API Key"
-              value={form.skip_trace_key || ""}
-              onChange={set("skip_trace_key")}
               placeholder="Your Easy Button Skip Trace API key"
               masked
               hint="From Easy Button Skip Trace dashboard → API Access"
+              error={errors.skip_trace_key?.message}
+              {...register("skip_trace_key")}
             />
             <div className="flex items-center gap-3">
               <label className="text-sm text-slate-300">Auto skip-trace on import</label>
               <button
-                onClick={() => set("auto_skip_trace")(form.auto_skip_trace === "true" ? "false" : "true")}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${form.auto_skip_trace === "true" ? "bg-emerald-500" : "bg-slate-600"}`}
+                type="button"
+                onClick={() =>
+                  setValue("auto_skip_trace", autoSkipTrace === "true" ? "false" : "true", {
+                    shouldValidate: true,
+                  })
+                }
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${autoSkipTrace === "true" ? "bg-emerald-500" : "bg-slate-600"}`}
               >
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${form.auto_skip_trace === "true" ? "translate-x-4.5" : "translate-x-0.5"}`} />
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${autoSkipTrace === "true" ? "translate-x-4.5" : "translate-x-0.5"}`} />
               </button>
-              <span className="text-xs text-slate-500">{form.auto_skip_trace === "true" ? "On — leads are skip-traced automatically" : "Off — skip trace manually from the leads dashboard"}</span>
+              <span className="text-xs text-slate-500">{autoSkipTrace === "true" ? "On — leads are skip-traced automatically" : "Off — skip trace manually from the leads dashboard"}</span>
             </div>
           </div>
 
           <div className="pt-2">
-            <button type="button" onClick={handleSave} disabled={saving} className="atlas-btn disabled:opacity-50">
+            <button type="button" onClick={() => void handleSave()} disabled={saving} className="atlas-btn disabled:opacity-50">
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? "Saving..." : "Save API Keys"}
             </button>
@@ -1049,7 +1092,15 @@ I need you to: [describe what you want]`}</CodeBlock>
           {/* Gmail Quick-Setup */}
           <div className="flex flex-wrap gap-2 pb-1">
             <button
-              onClick={() => setForm(f => ({ ...f, smtp_host: "smtp.gmail.com", smtp_port: "587", smtp_from: f.smtp_user || "" }))}
+              type="button"
+              onClick={() => {
+                setValue("smtp_host", "smtp.gmail.com", { shouldValidate: true });
+                setValue("smtp_port", "587", { shouldValidate: true });
+                const smtpUser = getValues("smtp_user");
+                if (smtpUser) {
+                  setValue("smtp_from", smtpUser, { shouldValidate: true });
+                }
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-xs font-medium transition-colors border border-slate-600"
             >
               <span>⚡</span> Use Gmail Defaults
@@ -1067,50 +1118,50 @@ I need you to: [describe what you want]`}</CodeBlock>
           <div className="grid md:grid-cols-2 gap-4">
             <InputField
               label="SMTP Host"
-              value={form.smtp_host || ""}
-              onChange={set("smtp_host")}
               placeholder="smtp.gmail.com"
               hint="Gmail: smtp.gmail.com | Outlook: smtp.office365.com"
+              error={errors.smtp_host?.message}
+              {...register("smtp_host")}
             />
             <InputField
               label="SMTP Port"
-              value={form.smtp_port || "587"}
-              onChange={set("smtp_port")}
               placeholder="587"
               hint="587 for TLS (recommended) | 465 for SSL"
+              error={errors.smtp_port?.message}
+              {...register("smtp_port")}
             />
             <InputField
               label="SMTP Username"
-              value={form.smtp_user || ""}
-              onChange={set("smtp_user")}
               placeholder="your@gmail.com"
+              error={errors.smtp_user?.message}
+              {...register("smtp_user")}
             />
             <InputField
               label="SMTP Password"
-              value={form.smtp_pass || ""}
-              onChange={set("smtp_pass")}
               placeholder="App Password (not your login password)"
               masked
               hint="Gmail: use a 16-character App Password, not your account password"
+              error={errors.smtp_pass?.message}
+              {...register("smtp_pass")}
             />
             <InputField
               label="From Address"
-              value={form.smtp_from || ""}
-              onChange={set("smtp_from")}
               placeholder="atlas@nationalhouses.com"
               hint="The 'From' name shown in email clients"
+              error={errors.smtp_from?.message}
+              {...register("smtp_from")}
             />
             <InputField
               label="Recipients"
-              value={form.email_recipients || ""}
-              onChange={set("email_recipients")}
               placeholder="tina@nationalhouses.com, team@nationalhouses.com"
               hint="Comma-separated list of email addresses to receive the daily CSV"
+              error={errors.email_recipients?.message}
+              {...register("email_recipients")}
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <button type="button" onClick={handleSave} disabled={saving} className="atlas-btn disabled:opacity-50">
+            <button type="button" onClick={() => void handleSave()} disabled={saving} className="atlas-btn disabled:opacity-50">
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? "Saving..." : "Save Email Settings"}
             </button>
@@ -1136,10 +1187,10 @@ I need you to: [describe what you want]`}</CodeBlock>
           </DialogHeader>
           <InputField
             label="Recipient Email"
-            value={testEmailAddress}
-            onChange={setTestEmailAddress}
             placeholder="example@mail.com"
             hint="This address will receive the test email."
+            error={testEmailErrors.email?.message}
+            {...registerTestEmail("email")}
           />
           <DialogFooter className="gap-2 sm:gap-2">
             <button
@@ -1152,8 +1203,8 @@ I need you to: [describe what you want]`}</CodeBlock>
             </button>
             <button
               type="button"
-              onClick={handleTestEmail}
-              disabled={testingEmail || !testEmailAddress.trim()}
+              onClick={() => void handleTestEmail()}
+              disabled={testingEmail}
               className="atlas-btn disabled:opacity-50"
             >
               {testingEmail ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
