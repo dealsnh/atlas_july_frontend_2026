@@ -1,8 +1,6 @@
 /** Per-client branding and county configuration (injected at build/deploy time). */
 export const CLIENT_CONFIG = {
   companyName: "National Houses",
-  userEmail: "tina@nationalhouses.com",
-  userPassword: "Tina1074$",
   accentColor: "#DC2626",
   counties: [
     {
@@ -72,5 +70,3 @@ export const CLIENT_CONFIG = {
     },
   ],
 } as const;
-
-export type ClientCounty = (typeof CLIENT_CONFIG.counties)[number];

@@ -4,10 +4,179 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react";
-import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
+import {
+  DayButton,
+  DayPicker,
+  getDefaultClassNames,
+  useDayPicker,
+  type MonthCaptionProps,
+} from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
+
+const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+function useOnClickOutside(
+  ref: React.RefObject<HTMLElement | null>,
+  handler: () => void,
+  enabled: boolean,
+) {
+  React.useEffect(() => {
+    if (!enabled) return;
+
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (ref.current?.contains(target)) return;
+      handler();
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [ref, handler, enabled]);
+}
+
+function CalendarMonthCaption({ calendarMonth }: MonthCaptionProps) {
+  const { goToMonth, dayPickerProps } = useDayPicker();
+  const [monthMenuOpen, setMonthMenuOpen] = React.useState(false);
+  const [yearMenuOpen, setYearMenuOpen] = React.useState(false);
+  const monthMenuRef = React.useRef<HTMLDivElement>(null);
+  const yearMenuRef = React.useRef<HTMLDivElement>(null);
+  const yearListRef = React.useRef<HTMLDivElement>(null);
+
+  const date = calendarMonth.date;
+  const currentMonth = date.getMonth();
+  const currentYear = date.getFullYear();
+
+  const startYear =
+    dayPickerProps.startMonth?.getFullYear() ?? currentYear - 100;
+  const endYear = dayPickerProps.endMonth?.getFullYear() ?? currentYear;
+
+  const years = React.useMemo(() => {
+    const list: number[] = [];
+    for (let year = endYear; year >= startYear; year -= 1) {
+      list.push(year);
+    }
+    return list;
+  }, [startYear, endYear]);
+
+  useOnClickOutside(monthMenuRef, () => setMonthMenuOpen(false), monthMenuOpen);
+  useOnClickOutside(yearMenuRef, () => setYearMenuOpen(false), yearMenuOpen);
+
+  React.useEffect(() => {
+    if (!yearMenuOpen || !yearListRef.current) return;
+    yearListRef.current
+      .querySelector('[data-selected="true"]')
+      ?.scrollIntoView({ block: "center" });
+  }, [yearMenuOpen, currentYear]);
+
+  const goTo = (year: number, month: number) => {
+    goToMonth(new Date(year, month, 1));
+  };
+
+  const pickerButtonClass =
+    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+
+  const menuClass =
+    "calendar-month-year-menu absolute top-full z-50 mt-1 min-w-[9rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md";
+
+  return (
+    <div className="pointer-events-none relative flex h-(--cell-size) w-full items-center justify-center gap-1.5 px-(--cell-size)">
+      <div className="pointer-events-auto relative" ref={monthMenuRef}>
+        <button
+          type="button"
+          aria-expanded={monthMenuOpen}
+          aria-haspopup="listbox"
+          className={pickerButtonClass}
+          onClick={() => {
+            setYearMenuOpen(false);
+            setMonthMenuOpen((open) => !open);
+          }}
+        >
+          {MONTH_LABELS[currentMonth]}
+          <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+        </button>
+        {monthMenuOpen && (
+          <div className={cn(menuClass, "left-0")} role="listbox">
+            {MONTH_LABELS.map((label, monthIndex) => (
+              <button
+                key={label}
+                type="button"
+                role="option"
+                aria-selected={monthIndex === currentMonth}
+                data-selected={monthIndex === currentMonth ? "true" : undefined}
+                className="calendar-month-year-menu__item w-full"
+                onClick={() => {
+                  goTo(currentYear, monthIndex);
+                  setMonthMenuOpen(false);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="pointer-events-auto relative" ref={yearMenuRef}>
+        <button
+          type="button"
+          aria-expanded={yearMenuOpen}
+          aria-haspopup="listbox"
+          className={pickerButtonClass}
+          onClick={() => {
+            setMonthMenuOpen(false);
+            setYearMenuOpen((open) => !open);
+          }}
+        >
+          {currentYear}
+          <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+        </button>
+        {yearMenuOpen && (
+          <div
+            ref={yearListRef}
+            className={cn(menuClass, "right-0 max-h-48 overflow-y-auto")}
+            role="listbox"
+          >
+            {years.map((year) => (
+              <button
+                key={year}
+                type="button"
+                role="option"
+                aria-selected={year === currentYear}
+                data-selected={year === currentYear ? "true" : undefined}
+                className="calendar-month-year-menu__item w-full"
+                onClick={() => {
+                  goTo(year, currentMonth);
+                  setYearMenuOpen(false);
+                }}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Calendar({
   className,
@@ -17,15 +186,27 @@ function Calendar({
   buttonVariant = "ghost",
   formatters,
   components,
+  startMonth,
+  endMonth,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) {
   const defaultClassNames = getDefaultClassNames();
+  const resolvedStartMonth = React.useMemo(
+    () => startMonth ?? new Date(new Date().getFullYear() - 100, 0, 1),
+    [startMonth],
+  );
+  const resolvedEndMonth = React.useMemo(
+    () => endMonth ?? new Date(new Date().getFullYear(), 11, 31),
+    [endMonth],
+  );
 
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      startMonth={resolvedStartMonth}
+      endMonth={resolvedEndMonth}
       className={cn(
         "bg-background group/calendar p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
@@ -46,17 +227,17 @@ function Calendar({
         ),
         month: cn("flex flex-col w-full gap-4", defaultClassNames.month),
         nav: cn(
-          "flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between",
+          "pointer-events-none z-30 flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between",
           defaultClassNames.nav
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) aria-disabled:opacity-50 p-0 select-none",
+          "pointer-events-auto relative z-30 size-(--cell-size) aria-disabled:opacity-50 p-0 select-none",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) aria-disabled:opacity-50 p-0 select-none",
+          "pointer-events-auto relative z-30 size-(--cell-size) aria-disabled:opacity-50 p-0 select-none",
           defaultClassNames.button_next
         ),
         month_caption: cn(
@@ -123,6 +304,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        MonthCaption: CalendarMonthCaption,
         Root: ({ className, rootRef, ...props }) => {
           return (
             <div

@@ -11,10 +11,9 @@ import type {
   AuthResponse,
   AuthSessionApiResponse,
   LoginRequest,
-  OkMessageResponse,
   SignupRequest,
 } from "@/types";
-import { getAccessToken, getRefreshToken } from "@/utils/authStorage";
+import { getAccessToken, getRefreshToken } from "@/lib/authStorage";
 
 function extractAuthSession(payload: unknown, fallbackMessage: string): ParsedAuthSession {
   if (payload && typeof payload === "object" && "success" in payload) {
@@ -50,50 +49,6 @@ export async function signup(payload: SignupRequest): Promise<ParsedAuthSession>
     skipUnauthorizedRedirect: true,
   });
   return extractAuthSession(data, "Signup failed");
-}
-
-function extractOkMessage(payload: unknown): OkMessageResponse {
-  const next = unwrapData(payload as ApiData<unknown>);
-  if (next == null || typeof next !== "object") {
-    return { ok: false };
-  }
-  const o = next as Record<string, unknown>;
-  return {
-    ok: Boolean(o.ok),
-    message: typeof o.message === "string" ? o.message : undefined,
-  };
-}
-
-export async function forgotPassword(payload: {
-  email: string;
-  redirectTo: string;
-}): Promise<OkMessageResponse> {
-  const data = await apiInvoker<ApiData<OkMessageResponse>>(
-    END_POINT.auth.forgotPassword,
-    "POST",
-    payload,
-    undefined,
-    { skipUnauthorizedRedirect: true },
-  );
-  return extractOkMessage(data);
-}
-
-export async function resetPassword(
-  payload: { password: string },
-  accessTokenFromLink: string,
-): Promise<OkMessageResponse> {
-  const token = accessTokenFromLink.trim();
-  const data = await apiInvoker<ApiData<OkMessageResponse>>(
-    END_POINT.auth.resetPassword,
-    "POST",
-    payload,
-    undefined,
-    {
-      skipUnauthorizedRedirect: true,
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  );
-  return extractOkMessage(data);
 }
 
 export async function logout(token?: string) {

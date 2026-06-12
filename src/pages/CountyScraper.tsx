@@ -30,14 +30,13 @@ import {
 import { useLeadsStore } from "@/store/leads/leadsStore";
 import { useScrapeStore } from "@/store/scrape/scrapeStore";
 import { useStatsStore } from "@/store/stats/statsStore";
+import {
+  getLeadStatusSelectOptions,
+  getLeadStatusSelectTriggerClassName,
+  getScrapeRunStatusClassName,
+  LEAD_STATUS_CONFIG,
+} from "@/constants/statusConfig";
 import type { EnrichLeadsData, LeadStatus, LeadsExportParams, LeadsListParams, ScrapeStatusResponse } from "@/types";
-
-const STATUS_CONFIG = {
-  new: { label: "New", className: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" },
-  reviewed: { label: "Reviewed", className: "bg-amber-500/15 text-amber-400 border border-amber-500/20" },
-  contacted: { label: "Contacted", className: "bg-blue-500/15 text-blue-400 border border-blue-500/20" },
-  skip: { label: "Skip", className: "bg-zinc-500/15 text-zinc-400 border border-zinc-500/20" },
-};
 
 const TYPE_COLORS: Record<string, string> = {
   "Pre-Foreclosure": "bg-red-500/15 text-red-400 border border-red-500/20",
@@ -69,7 +68,7 @@ function SkipTraceBadge({ skipTraced, compact = false }: { skipTraced: boolean |
     <span
       className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${
         traced
-          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+          ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/45"
           : "bg-white/5 text-white/40 border-white/10"
       }`}
       title={traced ? "Skip trace completed" : "Not skip traced yet"}
@@ -332,7 +331,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     try {
       await updateLead(id, { status });
       updateLeadInList(id, { status });
-      showApiSuccessToast(`Status updated to ${STATUS_CONFIG[status].label}`);
+      showApiSuccessToast(`Status updated to ${LEAD_STATUS_CONFIG[status].label}`);
     } catch (e) {
       showApiErrorToast(e);
     } finally {
@@ -639,12 +638,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                         <td className="py-1.5 pr-4 text-white/40">{dur !== null ? `${dur}s` : '—'}</td>
                         <td className="py-1.5 pr-4 font-mono text-white/70">{run.leads_found ?? 0}</td>
                         <td className="py-1.5">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            run.status === 'success' ? 'bg-emerald-500/15 text-emerald-400' :
-                            run.status === 'error' ? 'bg-red-500/15 text-red-400' :
-                            run.status === 'running' ? 'bg-blue-500/15 text-blue-400' :
-                            'bg-amber-500/15 text-amber-400'
-                          }`}>{run.status}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getScrapeRunStatusClassName(run.status)}`}>{run.status}</span>
                           {run.error && <span className="ml-2 text-red-400/60 truncate max-w-[200px] inline-block align-middle">{run.error}</span>}
                         </td>
                       </tr>
@@ -695,7 +689,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             value={selectedCounty}
             onValueChange={(value) => { setSelectedCounty(value); setPage(0); }}
             placeholder="All Counties"
-            className="w-full min-w-0 lg:min-w-[9.5rem] lg:max-w-[12rem]"
+            className="w-full min-w-[12.5rem]"
             options={[
               { value: "all", label: "All Counties" },
               ...counties.map((c) => ({ value: c.name, label: `${c.name}, ${c.state}` })),
@@ -705,7 +699,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             value={selectedType}
             onValueChange={(value) => { setSelectedType(value); setPage(0); }}
             placeholder="All Types"
-            className="w-full min-w-0 lg:min-w-[9.5rem] lg:max-w-[12rem]"
+            className="w-full min-w-[10.5rem]"
             options={[
               { value: "all", label: "All Types" },
               ...allTypes.map((t) => ({ value: t, label: t })),
@@ -715,13 +709,15 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             value={selectedStatus}
             onValueChange={(value) => { setSelectedStatus(value); setPage(0); }}
             placeholder="All Statuses"
-            className="w-full min-w-0 lg:min-w-[9.5rem] lg:max-w-[12rem]"
+            className="w-full min-w-[12rem]"
+            triggerClassName={
+              selectedStatus !== "all"
+                ? `atlas-select-trigger--status ${getLeadStatusSelectTriggerClassName(selectedStatus as LeadStatus)}`
+                : undefined
+            }
             options={[
               { value: "all", label: "All Statuses" },
-              ...LEAD_STATUSES.map((status) => ({
-                value: status,
-                label: STATUS_CONFIG[status].label,
-              })),
+              ...getLeadStatusSelectOptions(),
             ]}
           />
         </div>
@@ -807,9 +803,9 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                     {lead.filing_date && (() => {
                       const daysAgo = lead.filing_date ? Math.floor((Date.now() - new Date(lead.filing_date).getTime()) / 86400000) : 999;
                       const ageBadge = daysAgo <= 3
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/45"
                         : daysAgo <= 7
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        ? "bg-amber-500/25 text-amber-300 border border-amber-500/45"
                         : "bg-white/5 text-white/30 border border-white/10";
                       return (
                         <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${ageBadge}`}>
@@ -837,11 +833,8 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                     onTriggerClick={(e) => e.stopPropagation()}
                     disabled={updatingStatusId === lead.id}
                     size="sm"
-                    triggerClassName={`atlas-select-trigger--compact text-xs px-2 py-0.5 rounded-full font-medium border focus:outline-none cursor-pointer disabled:opacity-50 h-auto min-h-0 ${STATUS_CONFIG[lead.status]?.className || STATUS_CONFIG.new.className}`}
-                    options={LEAD_STATUSES.map((s) => ({
-                      value: s,
-                      label: STATUS_CONFIG[s].label,
-                    }))}
+                    triggerClassName={`atlas-select-trigger--compact atlas-select-trigger--status text-xs px-2 py-0.5 rounded-full font-medium border focus:outline-none cursor-pointer disabled:opacity-50 h-auto min-h-0 ${getLeadStatusSelectTriggerClassName(lead.status)}`}
+                    options={getLeadStatusSelectOptions()}
                   />
                   <ChevronDown className={`w-4 h-4 text-white/30 transition-transform ${expandedLead === lead.id ? "rotate-180" : ""}`} />
                 </div>
@@ -938,9 +931,9 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                           key={s}
                           onClick={(e) => { e.stopPropagation(); handleUpdateStatus(lead.id, s, lead.status); }}
                           disabled={updatingStatusId === lead.id}
-                          className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all disabled:opacity-50 ${lead.status === s ? STATUS_CONFIG[s].className : "bg-white/5 text-white/40 border border-white/10 hover:border-white/20"}`}
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all disabled:opacity-50 ${lead.status === s ? LEAD_STATUS_CONFIG[s].className : "bg-white/5 text-white/40 border border-white/10 hover:border-white/20"}`}
                         >
-                          {STATUS_CONFIG[s].label}
+                          {LEAD_STATUS_CONFIG[s].label}
                         </button>
                       ))}
                     </div>

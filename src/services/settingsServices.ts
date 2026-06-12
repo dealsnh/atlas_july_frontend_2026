@@ -134,15 +134,6 @@ function extractTestEmailResponse(payload: unknown): TestEmailResponse {
   return { ok: true, message: getMessageFromApiPayload(payload) };
 }
 
-/** Build `{ email }` payload for POST /settings/test-email. */
-export function prepareTestEmailPayload(recipientList: string | undefined): TestEmailPayload {
-  const email = recipientList?.split(",")[0]?.trim() ?? "";
-  if (!email) {
-    throw new Error("Enter at least one recipient email address");
-  }
-  return { email };
-}
-
 export async function getSettings() {
   const data = await apiInvoker<SettingsApiResponse | ApiData<AppSettings> | AppSettings>(
     END_POINT.settings.get,

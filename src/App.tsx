@@ -14,8 +14,6 @@ import { APP_ROUTES } from "@/constants/appRoutes";
 import { Toaster } from "@/components/ui/sonner";
 import { useAuthStore } from "@/store";
 
-export { CLIENT_CONFIG };
-
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -79,10 +77,10 @@ export default function App() {
       accentColor={CLIENT_CONFIG.accentColor}
     >
       <Switch>
-        <Route path="/">
-          <Redirect to="/county-scraper" />
+        <Route path={APP_ROUTES.ROOT}>
+          <Redirect to={APP_ROUTES.COUNTY_SCRAPER} />
         </Route>
-        <Route path="/county-scraper">
+        <Route path={APP_ROUTES.COUNTY_SCRAPER}>
           <CountyScraper
             counties={CLIENT_CONFIG.counties.map((c) => ({
               name: c.name,
@@ -91,17 +89,17 @@ export default function App() {
             }))}
           />
         </Route>
-        <Route path="/property-condition">
+        <Route path={APP_ROUTES.PROPERTY_CONDITION}>
           <PropertyCondition
             googleMapsConfigured={!!apiKeys.googleMaps}
             openAiConfigured={!!apiKeys.openAi}
           />
         </Route>
-        <Route path="/settings">
+        <Route path={APP_ROUTES.SETTINGS}>
           <Settings />
         </Route>
         <Route>
-          <Redirect to="/county-scraper" />
+          <Redirect to={APP_ROUTES.COUNTY_SCRAPER} />
         </Route>
       </Switch>
     </AppLayout>

@@ -110,9 +110,6 @@ export async function updateLead(id: string, payload: UpdateLeadPayload) {
   return extractUpdateLeadResponse(data);
 }
 
-/** @deprecated Use updateLead */
-export const updateLeadStatus = updateLead;
-
 function normalizeSkipTraceData(data?: SkipTraceData): SkipTraceResult {
   if (!data) return {};
   return {

@@ -6,8 +6,6 @@ import type { AuthUser } from "@/types";
  * Default: bearer access/refresh tokens in `localStorage`.
  * Cookie-based sessions: set `VITE_API_WITH_CREDENTIALS=true` once the API uses HttpOnly cookies.
  */
-export const AUTH_SESSION_STORAGE_MODE = "browser-local-storage" as const;
-
 const AUTH_TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "user";
@@ -78,12 +76,4 @@ export function getAccessToken(): string {
 export function getRefreshToken(): string {
   if (typeof window === "undefined") return "";
   return (localStorage.getItem(REFRESH_TOKEN_KEY) ?? "").trim();
-}
-
-export function getAccessTokenOrThrow(): string {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Missing access token. Please login again.");
-  }
-  return accessToken;
 }

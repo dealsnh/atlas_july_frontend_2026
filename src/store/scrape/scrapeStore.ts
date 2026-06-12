@@ -7,7 +7,6 @@ interface ScrapeState {
   runHistory: ScrapeRun[];
   setScraping: (scraping: boolean) => void;
   setScrapeLog: (log: string[]) => void;
-  appendScrapeLog: (line: string) => void;
   setRunHistory: (runs: ScrapeRun[]) => void;
   resetForSessionEnd: () => void;
 }
@@ -24,9 +23,6 @@ export const useScrapeStore = create<ScrapeState>((set) => ({
   setScraping: (scraping) => set({ scraping }),
 
   setScrapeLog: (scrapeLog) => set({ scrapeLog }),
-
-  appendScrapeLog: (line) =>
-    set((state) => ({ scrapeLog: [...state.scrapeLog, line] })),
 
   setRunHistory: (runHistory) => set({ runHistory }),
 

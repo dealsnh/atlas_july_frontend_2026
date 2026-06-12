@@ -5,12 +5,6 @@ const DEFAULT_DATETIME_OPTIONS: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-const DEFAULT_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-};
-
 function parseApiDateTime(value: string): Date | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -21,7 +15,7 @@ function parseApiDateTime(value: string): Date | null {
 }
 
 /** Format an ISO or date-only string for display. */
-export function formatDateTime(
+function formatDateTime(
   value: string | null | undefined,
   options: Intl.DateTimeFormatOptions = DEFAULT_DATETIME_OPTIONS,
   fallback = "Never",
@@ -32,15 +26,6 @@ export function formatDateTime(
   if (!date) return fallback;
 
   return date.toLocaleString("en-US", options);
-}
-
-/** Format a date without time (e.g. filing dates). */
-export function formatDate(
-  value: string | null | undefined,
-  options: Intl.DateTimeFormatOptions = DEFAULT_DATE_OPTIONS,
-  fallback = "—",
-): string {
-  return formatDateTime(value, options, fallback);
 }
 
 /** Compact scrape timestamp for dashboard cards. */

@@ -34,6 +34,16 @@ export function AtlasDatePicker({
     return false;
   };
 
+  const startMonth = React.useMemo(() => {
+    const minDate = min ? parseDateString(min) : undefined;
+    return minDate ? new Date(minDate.getFullYear(), minDate.getMonth(), 1) : undefined;
+  }, [min]);
+
+  const endMonth = React.useMemo(() => {
+    const maxDate = max ? parseDateString(max) : undefined;
+    return maxDate ? new Date(maxDate.getFullYear(), maxDate.getMonth(), 1) : undefined;
+  }, [max]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -60,6 +70,8 @@ export function AtlasDatePicker({
           }}
           disabled={isDisabled}
           defaultMonth={selected}
+          startMonth={startMonth}
+          endMonth={endMonth}
           className="atlas-calendar"
           classNames={{
             button_previous: "atlas-calendar-nav",

@@ -3,54 +3,10 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 import * as React from "react";
 
-// Context to track composition state across dialog children
-const DialogCompositionContext = React.createContext<{
-  isComposing: () => boolean;
-  setComposing: (composing: boolean) => void;
-  justEndedComposing: () => boolean;
-  markCompositionEnd: () => void;
-}>({
-  isComposing: () => false,
-  setComposing: () => {},
-  justEndedComposing: () => false,
-  markCompositionEnd: () => {},
-});
-
-export const useDialogComposition = () =>
-  React.useContext(DialogCompositionContext);
-
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  const composingRef = React.useRef(false);
-  const justEndedRef = React.useRef(false);
-  const endTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const contextValue = React.useMemo(
-    () => ({
-      isComposing: () => composingRef.current,
-      setComposing: (composing: boolean) => {
-        composingRef.current = composing;
-      },
-      justEndedComposing: () => justEndedRef.current,
-      markCompositionEnd: () => {
-        justEndedRef.current = true;
-        if (endTimerRef.current) {
-          clearTimeout(endTimerRef.current);
-        }
-        endTimerRef.current = setTimeout(() => {
-          justEndedRef.current = false;
-        }, 150);
-      },
-    }),
-    []
-  );
-
-  return (
-    <DialogCompositionContext.Provider value={contextValue}>
-      <DialogPrimitive.Root data-slot="dialog" {...props} />
-    </DialogCompositionContext.Provider>
-  );
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
 function DialogTrigger({
@@ -98,24 +54,15 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
-  const { isComposing } = useDialogComposition();
-
   const handleEscapeKeyDown = React.useCallback(
     (e: KeyboardEvent) => {
-      // Check both the native isComposing property and our context state
-      // This handles Safari's timing issues with composition events
-      const isCurrentlyComposing = (e as any).isComposing || isComposing();
-
-      // If IME is composing, prevent dialog from closing
-      if (isCurrentlyComposing) {
+      if ((e as KeyboardEvent & { isComposing?: boolean }).isComposing) {
         e.preventDefault();
         return;
       }
-
-      // Call user's onEscapeKeyDown if provided
       onEscapeKeyDown?.(e);
     },
-    [isComposing, onEscapeKeyDown]
+    [onEscapeKeyDown]
   );
 
   return (
@@ -206,4 +153,3 @@ export {
   DialogTitle,
   DialogTrigger
 };
-

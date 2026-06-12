@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuthStore } from "@/store";
+import { APP_ROUTES } from "@/constants/appRoutes";
 import {
   Map,
   Building2,
@@ -22,8 +23,8 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "County Scraper", icon: Map, href: "/county-scraper" },
-  { label: "Property Condition AI", icon: Building2, href: "/property-condition" },
+  { label: "County Scraper", icon: Map, href: APP_ROUTES.COUNTY_SCRAPER },
+  { label: "Property Condition AI", icon: Building2, href: APP_ROUTES.PROPERTY_CONDITION },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "atlas-sidebar-collapsed";
@@ -150,18 +151,18 @@ export default function AppLayout({ children, companyName, accentColor }: AppLay
 
       {/* Bottom */}
       <div className={`py-3 border-t border-white/[0.07] space-y-0.5 ${collapsed ? "px-1.5" : "px-2"}`}>
-        <Link href="/settings">
+        <Link href={APP_ROUTES.SETTINGS}>
           <a
             onClick={() => setMobileOpen(false)}
             title={collapsed ? "Settings" : undefined}
             className={`flex items-center rounded-md text-xs font-medium transition-all ${
               collapsed ? "justify-center px-1.5 py-2" : "gap-2 px-2 py-2"
             } ${
-              location === "/settings"
+              location === APP_ROUTES.SETTINGS
                 ? "text-white"
                 : "text-white/45 hover:text-white/80 hover:bg-white/[0.04]"
             }`}
-            style={location === "/settings" ? activeNavStyle : {}}
+            style={location === APP_ROUTES.SETTINGS ? activeNavStyle : {}}
           >
             <Settings className="w-3.5 h-3.5 shrink-0" />
             {!collapsed && <span className="truncate">Settings</span>}

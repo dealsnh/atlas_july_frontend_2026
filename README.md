@@ -8,8 +8,9 @@ Production-ready React + Vite frontend for the **National Houses / Atlas County 
 - **Vite 7** — dev server and production build
 - **Tailwind CSS 4** — styling (`@tailwindcss/vite`)
 - **Wouter** — client-side routing
-- **Radix UI + shadcn/ui** — accessible component primitives
-- **Recharts** — charts (where used)
+- **Radix UI + shadcn/ui** — accessible component primitives (dialog, select, calendar, popover)
+- **Zustand** — client state
+- **Zod + react-hook-form** — form validation
 - **Lucide React** — icons
 
 ## Prerequisites
@@ -41,20 +42,35 @@ The dev server starts at **http://localhost:5173** and proxies `/api` and `/auth
 
 ```
 src/
-├── components/       Shared UI (AppLayout, Map, ErrorBoundary, …)
-│   └── ui/           shadcn/Radix primitives (Button, Dialog, Table, …)
-├── pages/            Route-level views (CountyScraper, Settings, Login, …)
-├── hooks/            Custom hooks (useMobile, useComposition, …)
-├── contexts/         React context providers (ThemeContext)
-├── lib/              Utilities (cn helper via utils.ts)
-├── App.tsx           Root routing and auth gate
+├── components/
+│   ├── atlas/        App-specific shared UI (AtlasSelect, AtlasDatePicker)
+│   ├── ui/           shadcn primitives in use (button, calendar, dialog, popover, select, sonner)
+│   └── AppLayout.tsx Shell layout + sidebar navigation
+├── pages/            Route views (CountyScraper, PropertyCondition, Settings, Login, Signup)
+├── services/         API calls (auth, leads, scrape, settings)
+├── store/            Zustand stores (auth, leads, scrape, settings, stats)
+├── types/            Shared TypeScript types
+├── constants/        App config, routes, filters, status colors
+├── validations/      Zod schemas (auth, settings)
+├── lib/              Axios, API helpers, auth storage, utilities
+├── App.tsx           Routing (Wouter) and auth gate
 ├── main.tsx          React entry point
-├── index.css         Global styles + Tailwind theme
-└── const.ts          Shared constants and OAuth URL helper
+└── index.css         Global styles + Tailwind theme
 
-shared/               Cross-package constants used by the frontend
-public/               Static assets served as-is
+public/               Static assets (favicon, atlas.png)
 ```
+
+### Layering
+
+| Layer | Role |
+|-------|------|
+| `pages/` | UI + page state; calls stores and services |
+| `store/` | Client state (Zustand) |
+| `services/` | HTTP/API; no React |
+| `lib/` | Shared utilities (axios, auth storage, formatting) |
+| `constants/` | Static config and route paths (`APP_ROUTES`) |
+| `validations/` | Zod schemas for forms |
+| `types/` | Shared TypeScript interfaces |
 
 ## Environment variables
 
@@ -63,12 +79,7 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `VITE_API_BASE_URL` | Optional | API root including version prefix (e.g. `https://host/api/v1`). Leave empty to use same-origin `/api/v1` — Vite proxy in dev, `vercel.json` rewrite in production. |
-| `VITE_OAUTH_PORTAL_URL` | Optional | OAuth portal base URL |
-| `VITE_APP_ID` | Optional | OAuth application ID |
-| `VITE_FRONTEND_FORGE_API_KEY` | Optional | Google Maps proxy API key |
-| `VITE_FRONTEND_FORGE_API_URL` | Optional | Maps proxy base URL |
-| `VITE_ANALYTICS_ENDPOINT` | Optional | Umami analytics endpoint |
-| `VITE_ANALYTICS_WEBSITE_ID` | Optional | Umami website ID |
+| `VITE_API_WITH_CREDENTIALS` | Optional | Set to `true` when the API uses HttpOnly cookies or credentialed cross-origin requests. Default: `false`. |
 
 > Only variables prefixed with `VITE_` are exposed to browser code via `import.meta.env`.
 

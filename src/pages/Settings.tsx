@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { useSettingsStore, useStatsStore, settingsToFormValues } from "@/store";
 import { settingsSaveSchema, testEmailSchema, type SettingsSaveFormValues, type TestEmailFormValues } from "@/validations";
+import { SOURCE_STATUS_COLORS } from "@/constants/statusConfig";
 import {
   CheckCircle, XCircle, AlertCircle, Clock,
   ChevronDown, ChevronRight, Save, Eye, EyeOff,
@@ -234,13 +235,13 @@ const LEAD_MATRIX: CountyMatrix[] = [
 ];
 
 const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  live:             { label: "Live",              color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",  icon: <CheckCircle className="w-3 h-3" /> },
-  possible:         { label: "Possible",          color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",    icon: <AlertCircle className="w-3 h-3" /> },
-  needs_attom:      { label: "Needs ATTOM",       color: "bg-orange-500/20 text-orange-300 border-orange-500/30",    icon: <Key className="w-3 h-3" /> },
-  needs_brightdata: { label: "Needs Bright Data", color: "bg-purple-500/20 text-purple-300 border-purple-500/30",    icon: <Zap className="w-3 h-3" /> },
-  blocked:          { label: "Blocked",           color: "bg-red-500/20 text-red-300 border-red-500/30",              icon: <XCircle className="w-3 h-3" /> },
-  stale:            { label: "Data Stale",        color: "bg-slate-500/20 text-slate-300 border-slate-500/30",        icon: <Clock className="w-3 h-3" /> },
-  na:               { label: "N/A",               color: "bg-slate-700/30 text-slate-500 border-slate-600/20",        icon: <Clock className="w-3 h-3" /> },
+  live:             { label: "Live",              color: SOURCE_STATUS_COLORS.live,             icon: <CheckCircle className="w-3 h-3" /> },
+  possible:         { label: "Possible",          color: SOURCE_STATUS_COLORS.possible,         icon: <AlertCircle className="w-3 h-3" /> },
+  needs_attom:      { label: "Needs ATTOM",       color: SOURCE_STATUS_COLORS.needs_attom,      icon: <Key className="w-3 h-3" /> },
+  needs_brightdata: { label: "Needs Bright Data", color: SOURCE_STATUS_COLORS.needs_brightdata, icon: <Zap className="w-3 h-3" /> },
+  blocked:          { label: "Blocked",           color: SOURCE_STATUS_COLORS.blocked,          icon: <XCircle className="w-3 h-3" /> },
+  stale:            { label: "Data Stale",        color: SOURCE_STATUS_COLORS.stale,            icon: <Clock className="w-3 h-3" /> },
+  na:               { label: "N/A",               color: SOURCE_STATUS_COLORS.na,               icon: <Clock className="w-3 h-3" /> },
 };
 
 function StatusBadge({ status }: { status: LeadStatus }) {
@@ -964,7 +965,7 @@ I need you to: [describe what you want]`}</CodeBlock>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">Required for Jefferson County AL tax delinquent — JCCAL ArcGIS is behind Imperva WAF</p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full border ${settings.bright_data_configured ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-purple-500/20 text-purple-300 border-purple-500/30"}`}>
+              <span className={`text-xs px-2 py-1 rounded-full border ${settings.bright_data_configured ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/45" : "bg-purple-500/25 text-purple-300 border-purple-500/45"}`}>
                 {settings.bright_data_configured ? "✓ Configured" : "Not configured"}
               </span>
             </div>
@@ -979,7 +980,6 @@ I need you to: [describe what you want]`}</CodeBlock>
               <InputField
                 label="Bright Data Password"
                 placeholder="Your zone password"
-                masked
                 error={errors.bright_data_pass?.message}
                 {...register("bright_data_pass")}
               />
@@ -995,14 +995,13 @@ I need you to: [describe what you want]`}</CodeBlock>
                 <h3 className="font-medium text-white">ATTOM Data API</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Unlocks tax delinquent for Morgan, Montgomery, Shelby, Limestone, Autauga, Elmore AL (~$150/mo)</p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full border ${settings.attom_configured ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-orange-500/20 text-orange-300 border-orange-500/30"}`}>
+              <span className={`text-xs px-2 py-1 rounded-full border ${settings.attom_configured ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/45" : "bg-orange-500/25 text-orange-300 border-orange-500/45"}`}>
                 {settings.attom_configured ? "✓ Configured" : "Not configured"}
               </span>
             </div>
             <InputField
               label="ATTOM API Key"
               placeholder="Your ATTOM API key"
-              masked
               hint="From api.gateway.attomdata.com → Account → API Keys"
               error={errors.attom_api_key?.message}
               {...register("attom_api_key")}
@@ -1018,14 +1017,13 @@ I need you to: [describe what you want]`}</CodeBlock>
                 <h3 className="font-medium text-white">ScraperAPI</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Optional proxy for JS-rendered county portals (~$29/mo)</p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full border ${settings.scraper_api_configured ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-slate-600/20 text-slate-400 border-slate-600/30"}`}>
+              <span className={`text-xs px-2 py-1 rounded-full border ${settings.scraper_api_configured ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/45" : "bg-slate-600/25 text-slate-400 border-slate-600/45"}`}>
                 {settings.scraper_api_configured ? "✓ Configured" : "Not configured"}
               </span>
             </div>
             <InputField
               label="ScraperAPI Key"
               placeholder="Your ScraperAPI key"
-              masked
               hint="From scraperapi.com → Dashboard → API Key"
               error={errors.scraper_api_key?.message}
               {...register("scraper_api_key")}
@@ -1043,14 +1041,13 @@ I need you to: [describe what you want]`}</CodeBlock>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">Appends phone numbers and emails to leads on import. Only skip trace provider supported.</p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full border ${settings.skip_trace_configured ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-slate-600/20 text-slate-400 border-slate-600/30"}`}>
+              <span className={`text-xs px-2 py-1 rounded-full border ${settings.skip_trace_configured ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/45" : "bg-slate-600/25 text-slate-400 border-slate-600/45"}`}>
                 {settings.skip_trace_configured ? "✓ Configured" : "Not configured"}
               </span>
             </div>
             <InputField
               label="Easy Button Skip Trace API Key"
               placeholder="Your Easy Button Skip Trace API key"
-              masked
               hint="From Easy Button Skip Trace dashboard → API Access"
               error={errors.skip_trace_key?.message}
               {...register("skip_trace_key")}
@@ -1139,7 +1136,6 @@ I need you to: [describe what you want]`}</CodeBlock>
             <InputField
               label="SMTP Password"
               placeholder="App Password (not your login password)"
-              masked
               hint="Gmail: use a 16-character App Password, not your account password"
               error={errors.smtp_pass?.message}
               {...register("smtp_pass")}

@@ -12,6 +12,7 @@ export interface AtlasSelectOption {
   value: string;
   label: React.ReactNode;
   disabled?: boolean;
+  itemClassName?: string;
 }
 
 export interface AtlasSelectProps {
@@ -43,7 +44,17 @@ export function AtlasSelect({
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         size={size}
-        className={cn("atlas-select-trigger", className, triggerClassName)}
+        className={cn(
+          "atlas-select-trigger",
+          "h-auto !pr-8",
+          "[&_[data-slot=select-value]]:line-clamp-none",
+          "[&_[data-slot=select-value]]:flex-1",
+          "[&_[data-slot=select-value]]:min-w-0",
+          "[&_[data-slot=select-value]]:overflow-visible",
+          "[&_[data-slot=select-value]]:text-clip",
+          className,
+          triggerClassName,
+        )}
         onClick={onTriggerClick}
       >
         <SelectValue placeholder={placeholder} />
@@ -54,7 +65,7 @@ export function AtlasSelect({
             key={option.value}
             value={option.value}
             disabled={option.disabled}
-            className="atlas-select-item"
+            className={cn("atlas-select-item", option.itemClassName)}
           >
             {option.label}
           </SelectItem>

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Building2, Satellite, Eye, Star, AlertCircle, Settings, CheckCircle2, Zap } from "lucide-react";
 import { Link } from "wouter";
+import { APP_ROUTES } from "@/constants/appRoutes";
 
 interface PropertyConditionProps {
   googleMapsConfigured: boolean;
@@ -83,7 +84,7 @@ export default function PropertyCondition({ googleMapsConfigured, openAiConfigur
                   </div>
                 ))}
               </div>
-              <Link href="/settings">
+              <Link href={APP_ROUTES.SETTINGS}>
                 <a className="atlas-btn text-xs">
                   <Settings className="w-3.5 h-3.5" />
                   Configure in Settings

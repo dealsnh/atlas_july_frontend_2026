@@ -16,7 +16,7 @@ import type {
   TriggerScrapeData,
   TriggerScrapePayload,
 } from "@/types";
-import { getAccessToken } from "@/utils/authStorage";
+import { getAccessToken } from "@/lib/authStorage";
 
 function assertApiSuccess(payload: unknown, fallbackMessage: string): void {
   if (!payload || typeof payload !== "object" || !("success" in payload)) return;

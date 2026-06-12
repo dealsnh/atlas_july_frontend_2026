@@ -4,7 +4,7 @@ import { APP_ROUTES } from "@/constants/appRoutes";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { isApiWithCredentialsEnabled } from "@/lib/apiClientEnv";
 import { END_POINT } from "@/lib/apiURL";
-import { getAccessToken } from "@/utils/authStorage";
+import { getAccessToken } from "@/lib/authStorage";
 
 const baseURL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 30_000;
