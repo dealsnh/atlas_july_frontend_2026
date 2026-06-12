@@ -215,7 +215,7 @@ export default function Signup({ companyName, accentColor }: SignupProps) {
             )}
             <button
               type="submit"
-              disabled={loading}
+              disabled
               className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-60 mt-1"
               style={{ backgroundColor: accentColor, boxShadow: `0 4px 24px ${accentColor}40` }}
             >
