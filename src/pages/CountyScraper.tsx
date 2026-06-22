@@ -470,7 +470,11 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
 
   const totalPages = Math.max(1, Math.ceil(leadsTotal / PAGE_SIZE));
   const dbTypes = stats ? stats.byType.map((t) => t.lead_type) : leads.map((l) => l.lead_type);
-  const allTypes = Array.from(new Set([...LEAD_TYPES, ...dbTypes])).sort();
+  // Filter out null/undefined/empty/whitespace lead types: a Radix <Select.Item value="">
+  // (from leads with a NULL/empty lead_type) throws and crashes the Lead Type dropdown on open.
+  const allTypes = Array.from(
+    new Set([...LEAD_TYPES, ...dbTypes].filter((t): t is string => typeof t === "string" && t.trim() !== "")),
+  ).sort();
 
   return (
     <div className="atlas-page-shell">
