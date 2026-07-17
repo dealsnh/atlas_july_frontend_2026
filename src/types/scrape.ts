@@ -41,6 +41,10 @@ export interface ScrapeRunsApiResponse {
 export interface TriggerScrapePayload {
   from_date: string;
   to_date: string;
+  /** Restrict the run to a single county (matches the backend county name). */
+  county?: string;
+  /** Restrict the run to a single lead type. */
+  lead_type?: string;
 }
 
 export interface TriggerScrapeData {

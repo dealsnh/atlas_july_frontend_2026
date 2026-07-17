@@ -130,6 +130,8 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   const [showScrapeStartedDialog, setShowScrapeStartedDialog] = useState(false);
   const [scrapeFromDate, setScrapeFromDate] = useState("");
   const [scrapeToDate, setScrapeToDate] = useState("");
+  // Non-null = the next scrape run targets only this lead type (from the dropdown filter).
+  const [scrapeLeadType, setScrapeLeadType] = useState<string | null>(null);
   const [showEnrichDialog, setShowEnrichDialog] = useState(false);
   const [showEnrichResultDialog, setShowEnrichResultDialog] = useState(false);
   const [enrichCounty, setEnrichCounty] = useState("");
@@ -266,7 +268,8 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     }
   };
 
-  const openScrapeDateDialog = () => {
+  const openScrapeDateDialog = (leadType: string | null = null) => {
+    setScrapeLeadType(leadType);
     setScrapeFromDate(fromDate || getScrapeDefaultFromDate());
     setScrapeToDate(toDate || getScrapeDefaultToDate());
     setShowScrapeDateDialog(true);
@@ -287,9 +290,16 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
 
     setShowScrapeDateDialog(false);
     setScraping(true);
-    setScrapeLog([`Starting scrape (${scrapeFromDate} → ${scrapeToDate})...`]);
+    setScrapeLog([
+      `Starting ${scrapeLeadType ? `${scrapeLeadType} ` : ""}scrape (${scrapeFromDate} → ${scrapeToDate})...`,
+    ]);
     try {
-      const result = await triggerScrape({ from_date: scrapeFromDate, to_date: scrapeToDate });
+      const result = await triggerScrape({
+        from_date: scrapeFromDate,
+        to_date: scrapeToDate,
+        ...(scrapeLeadType ? { lead_type: scrapeLeadType } : {}),
+        ...(scrapeLeadType && selectedCounty !== "all" ? { county: selectedCounty } : {}),
+      });
       const message = result.message?.trim() || "Scrape started";
       setScrapeLog([message]);
       setShowScrapeStartedDialog(true);
@@ -562,7 +572,15 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             <Sparkles className={`w-3.5 h-3.5 ${enriching ? "animate-pulse" : ""}`} />
             {enriching ? "Enriching..." : "Enrich Leads"}
           </button>
-          <button onClick={openScrapeDateDialog} disabled={scraping}
+          {selectedType !== "all" && (
+            <button onClick={() => openScrapeDateDialog(selectedType)} disabled={scraping}
+              title={`Run the scraper for ${selectedType} leads only`}
+              className="atlas-btn atlas-btn-primary-glow col-span-2 sm:col-span-1 text-xs disabled:opacity-50">
+              <Zap className="w-3.5 h-3.5" />
+              {scraping ? "Scraping..." : `Scrape ${selectedType}`}
+            </button>
+          )}
+          <button onClick={() => openScrapeDateDialog()} disabled={scraping}
             className="atlas-btn atlas-btn-primary-glow col-span-2 sm:col-span-1 text-xs disabled:opacity-50">
             <RefreshCw className={`w-3.5 h-3.5 ${scraping ? "animate-spin" : ""}`} />
             {scraping ? "Scraping..." : "Run Scrape"}
@@ -780,7 +798,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
           <Database className="w-10 h-10 opacity-30" />
           <p className="text-sm">No leads yet. Run a scrape or pull historical data to get started.</p>
           <div className="flex gap-2">
-            <button onClick={openScrapeDateDialog} disabled={scraping}
+            <button onClick={() => openScrapeDateDialog()} disabled={scraping}
               className="atlas-btn">Run Scrape Now</button>
             <button onClick={() => setShowHistorical(true)}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white/60 border border-white/10">
@@ -1087,9 +1105,13 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
           onKeyDown={handleScrapeDateDialogKeyDown}
         >
           <DialogHeader>
-            <DialogTitle className="text-white">Run Scrape</DialogTitle>
+            <DialogTitle className="text-white">
+              {scrapeLeadType ? `Run Scrape — ${scrapeLeadType} only` : "Run Scrape"}
+            </DialogTitle>
             <DialogDescription className="text-white/45">
-              Choose the date range to scrape. Only records within this window will be pulled.
+              {scrapeLeadType
+                ? `Only the ${scrapeLeadType} scraper will run. Choose the date range to scrape.`
+                : "Choose the date range to scrape. Only records within this window will be pulled."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1150,7 +1172,9 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
               <DialogTitle className="text-white">Scrape is on its way</DialogTitle>
             </div>
             <DialogDescription className="text-white/55 text-sm leading-relaxed">
-              We&apos;re pulling leads from{" "}
+              We&apos;re pulling {scrapeLeadType ? (
+                <span className="text-white/80 font-medium">{scrapeLeadType} </span>
+              ) : ""}leads from{" "}
               <span className="text-white/80 font-medium">{scrapeFromDate}</span> to{" "}
               <span className="text-white/80 font-medium">{scrapeToDate}</span>.
               {" "}This usually takes about <span className="text-white/80 font-medium">30 minutes</span> to finish.
