@@ -45,6 +45,9 @@ export type {
   TriggerScrapeData,
   TriggerScrapeApiResponse,
   TriggerHistoricalScrapePayload,
+  ScrapeScheduleResponse,
+  ScrapeScheduleApiResponse,
+  SetScrapeSchedulePayload,
 } from "./scrape";
 
 export type {

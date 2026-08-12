@@ -8,6 +8,8 @@ import type {
   ScrapeRun,
   ScrapeRunsApiResponse,
   ScrapeRunsResponse,
+  ScrapeScheduleApiResponse,
+  ScrapeScheduleResponse,
   ScrapeStatusApiResponse,
   ScrapeStatusResponse,
   ScrapeStreamEvent,
@@ -91,6 +93,35 @@ export async function triggerScrape(payload: TriggerScrapePayload): Promise<Trig
     payload,
   );
   return extractTriggerScrapeResponse(data);
+}
+
+function extractScrapeSchedule(payload: unknown): ScrapeScheduleResponse {
+  if (payload && typeof payload === "object" && "success" in payload) {
+    const envelope = payload as ScrapeScheduleApiResponse;
+    assertApiSuccess(payload, "Failed to load daily scrape schedule");
+    if (!envelope.data) {
+      throw new Error(getMessageFromApiPayload(payload) || "Failed to load daily scrape schedule");
+    }
+    return envelope.data;
+  }
+
+  const next = unwrapData(payload as ApiData<ScrapeScheduleResponse>);
+  if (next && typeof next === "object") return next as ScrapeScheduleResponse;
+  return payload as ScrapeScheduleResponse;
+}
+
+/** Read whether the automatic 9:00 AM PT daily scrape is paused. */
+export async function getScrapeSchedule(): Promise<ScrapeScheduleResponse> {
+  const data = await apiInvoker<ScrapeScheduleApiResponse>(END_POINT.scrape.schedule, "GET");
+  return extractScrapeSchedule(data);
+}
+
+/** Pause (true) or resume (false) the automatic daily scrape. */
+export async function setScrapeSchedulePaused(paused: boolean): Promise<ScrapeScheduleResponse> {
+  const data = await apiInvoker<ScrapeScheduleApiResponse>(END_POINT.scrape.schedule, "POST", {
+    paused,
+  });
+  return extractScrapeSchedule(data);
 }
 
 export async function triggerHistoricalScrape(payload: TriggerHistoricalScrapePayload) {

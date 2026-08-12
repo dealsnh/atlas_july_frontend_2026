@@ -64,3 +64,22 @@ export interface TriggerScrapeApiResponse {
 export interface TriggerHistoricalScrapePayload {
   days_back: number;
 }
+
+/** Daily (9:00 AM PT) scrape schedule state. */
+export interface ScrapeScheduleResponse {
+  paused: boolean;
+  cron?: string;
+  timezone?: string;
+  message?: string;
+}
+
+export interface ScrapeScheduleApiResponse {
+  success: boolean;
+  message?: string;
+  data?: ScrapeScheduleResponse;
+  requestId?: string;
+}
+
+export interface SetScrapeSchedulePayload {
+  paused: boolean;
+}

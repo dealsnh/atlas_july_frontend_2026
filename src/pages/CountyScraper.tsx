@@ -1,6 +1,6 @@
 // County Scraper — full-stack live data version
 import { useState, useEffect, useCallback } from "react";
-import { MapPin, Clock, Download, RefreshCw, Filter, Search, ChevronDown, ChevronUp, Database, Zap, History, UserSearch, Phone, Mail, CheckCircle2, Activity, Trash2, RotateCcw, Sparkles } from "lucide-react";
+import { MapPin, Clock, Download, RefreshCw, Filter, Search, ChevronDown, ChevronUp, Database, Zap, History, UserSearch, Phone, Mail, CheckCircle2, Activity, Trash2, RotateCcw, Sparkles, Pause, Play } from "lucide-react";
 import { AtlasDatePicker, AtlasSelect } from "@/components/atlas";
 import { LEAD_STATUSES, LEAD_TYPES } from "@/constants/leadFilters";
 import { formatLastScrapeTime, getLastScrapeTimestamp } from "@/lib/dateTimeFormat";
@@ -22,7 +22,9 @@ import {
 } from "@/components/ui/dialog";
 import {
   getScrapeRuns,
+  getScrapeSchedule,
   getScrapeStatus,
+  setScrapeSchedulePaused,
   subscribeScrapeStream,
   triggerHistoricalScrape,
   triggerScrape,
@@ -126,6 +128,8 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   const [showRunHistory, setShowRunHistory] = useState(false);
   const [runHistoryExpanded, setRunHistoryExpanded] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [dailyScrapePaused, setDailyScrapePaused] = useState(false);
+  const [togglingDailyScrape, setTogglingDailyScrape] = useState(false);
   const [showScrapeDateDialog, setShowScrapeDateDialog] = useState(false);
   const [showScrapeStartedDialog, setShowScrapeStartedDialog] = useState(false);
   const [scrapeFromDate, setScrapeFromDate] = useState("");
@@ -219,6 +223,12 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   }, [applyScrapeStatus]);
 
   useEffect(() => {
+    getScrapeSchedule()
+      .then((schedule) => setDailyScrapePaused(Boolean(schedule.paused)))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!scraping) return;
 
     const unsubscribe = subscribeScrapeStream({
@@ -265,6 +275,25 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
       showApiErrorToast(e);
     } finally {
       setCheckingStatus(false);
+    }
+  };
+
+  const handleToggleDailyScrape = async () => {
+    const nextPaused = !dailyScrapePaused;
+    setTogglingDailyScrape(true);
+    try {
+      const schedule = await setScrapeSchedulePaused(nextPaused);
+      setDailyScrapePaused(Boolean(schedule.paused));
+      showApiSuccessToast(
+        schedule.message ||
+          (schedule.paused
+            ? "Daily scrape paused — the 9:00 AM PT run is off"
+            : "Daily scrape resumed — the 9:00 AM PT run is back on"),
+      );
+    } catch (e) {
+      showApiErrorToast(e);
+    } finally {
+      setTogglingDailyScrape(false);
     }
   };
 
@@ -580,6 +609,28 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
               {scraping ? "Scraping..." : `Scrape ${selectedType}`}
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleToggleDailyScrape}
+            disabled={togglingDailyScrape}
+            title={
+              dailyScrapePaused
+                ? "Daily scrape is paused — click to resume the automatic 9:00 AM PT run"
+                : "Daily scrape is active — click to pause the automatic 9:00 AM PT run"
+            }
+            className={`atlas-btn-ghost-sm border col-span-2 sm:col-span-1 text-xs transition-colors disabled:opacity-50 ${
+              dailyScrapePaused
+                ? "border-amber-500/25 text-amber-300/90 hover:bg-amber-500/10 hover:text-amber-200"
+                : "border-white/10"
+            }`}
+          >
+            {dailyScrapePaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+            {togglingDailyScrape
+              ? "Saving..."
+              : dailyScrapePaused
+                ? "Daily Scrape: Paused"
+                : "Daily Scrape: On"}
+          </button>
           <button onClick={() => openScrapeDateDialog()} disabled={scraping}
             className="atlas-btn atlas-btn-primary-glow col-span-2 sm:col-span-1 text-xs disabled:opacity-50">
             <RefreshCw className={`w-3.5 h-3.5 ${scraping ? "animate-spin" : ""}`} />

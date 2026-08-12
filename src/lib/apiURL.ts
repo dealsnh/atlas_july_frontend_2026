@@ -22,6 +22,7 @@ export const END_POINT = {
     runs: "/scrape/runs",
     trigger: "/scrape",
     historical: "/scrape/historical",
+    schedule: "/scrape/schedule",
   },
   settings: {
     get: "/settings",
