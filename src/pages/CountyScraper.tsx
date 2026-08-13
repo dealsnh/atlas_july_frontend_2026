@@ -354,7 +354,10 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
         from_date: scrapeFromDate,
         to_date: scrapeToDate,
         ...(scrapeLeadType ? { lead_type: scrapeLeadType } : {}),
-        ...(scrapeLeadType && selectedCounty !== "all"
+        // County targeting is independent of lead type: selecting a county with no
+        // lead type must still scope the run, otherwise the backend sees no filter
+        // and falls back to scraping every configured county.
+        ...(selectedCounty !== "all"
           ? {
               county: splitCountyValue(selectedCounty).county,
               // Without the state, targeting "Hamilton" would scrape both OH and TN.
