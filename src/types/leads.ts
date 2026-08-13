@@ -54,6 +54,8 @@ export interface Lead {
 
 export interface LeadsListParams {
   county?: string;
+  /** Required alongside `county` when the name is shared across states (Hamilton OH / TN). */
+  state?: string;
   lead_type?: string;
   status?: LeadStatus | string;
   from_date?: string;
@@ -135,11 +137,13 @@ export interface SkipTraceResult {
 
 export type LeadsExportParams = Pick<
   LeadsListParams,
-  "county" | "lead_type" | "status" | "from_date" | "to_date"
+  "county" | "state" | "lead_type" | "status" | "from_date" | "to_date"
 >;
 
 export interface DeleteLeadsPayload {
   county?: string;
+  /** Scopes a by-county delete to one state — without it both Hamiltons are deleted. */
+  state?: string;
   source_url?: string;
   owner_name_contains?: string;
 }

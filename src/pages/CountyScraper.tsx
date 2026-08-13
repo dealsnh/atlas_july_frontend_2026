@@ -85,6 +85,23 @@ interface CountyScraperProps {
   counties: Array<{ name: string; state: string; leadTypes: string[] }>;
 }
 
+/**
+ * County selections are carried as "<name>|<ST>", not the bare name.
+ *
+ * County names are NOT unique across states — the client tracks both Hamilton
+ * County OHIO and Hamilton County TENNESSEE. Keyed on name alone, the two would
+ * collapse into one indistinguishable dropdown option, the leads list would mix
+ * both counties, and the enrich/delete dialogs would resolve to whichever appeared
+ * first in the config (OH). Every county request therefore sends county + state.
+ */
+const countyValue = (c: { name: string; state: string }): string => `${c.name}|${c.state}`;
+
+function splitCountyValue(value: string): { county: string; state?: string } {
+  if (!value || value === "all") return { county: "" };
+  const [county = "", state = ""] = value.split("|");
+  return { county, state: state || undefined };
+}
+
 function getScrapeDefaultFromDate(): string {
   const d = new Date();
   d.setDate(d.getDate() - 7);
@@ -144,6 +161,8 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   const [enrichResult, setEnrichResult] = useState<EnrichLeadsData | null>(null);
   const [showDeleteLeadsDialog, setShowDeleteLeadsDialog] = useState(false);
   const [deleteCounty, setDeleteCounty] = useState("");
+  // Deleting by county name alone would hit Hamilton OH and Hamilton TN together.
+  const [deleteState, setDeleteState] = useState("");
   const [deleteSourceUrl, setDeleteSourceUrl] = useState("");
   const [deleteOwnerNameContains, setDeleteOwnerNameContains] = useState("");
   const [deletingLeads, setDeletingLeads] = useState(false);
@@ -183,7 +202,11 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
     };
-    if (selectedCounty !== "all") params.county = selectedCounty;
+    if (selectedCounty !== "all") {
+      const { county, state } = splitCountyValue(selectedCounty);
+      params.county = county;
+      if (state) params.state = state;
+    }
     if (selectedType !== "all") params.lead_type = selectedType;
     if (selectedStatus !== "all") params.status = selectedStatus;
     if (fromDate) params.from_date = fromDate;
@@ -193,7 +216,11 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
 
   const buildExportParams = useCallback((): LeadsExportParams => {
     const params: LeadsExportParams = {};
-    if (selectedCounty !== "all") params.county = selectedCounty;
+    if (selectedCounty !== "all") {
+      const { county, state } = splitCountyValue(selectedCounty);
+      params.county = county;
+      if (state) params.state = state;
+    }
     if (selectedType !== "all") params.lead_type = selectedType;
     if (selectedStatus !== "all") params.status = selectedStatus;
     if (fromDate) params.from_date = fromDate;
@@ -327,7 +354,15 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
         from_date: scrapeFromDate,
         to_date: scrapeToDate,
         ...(scrapeLeadType ? { lead_type: scrapeLeadType } : {}),
-        ...(scrapeLeadType && selectedCounty !== "all" ? { county: selectedCounty } : {}),
+        ...(scrapeLeadType && selectedCounty !== "all"
+          ? {
+              county: splitCountyValue(selectedCounty).county,
+              // Without the state, targeting "Hamilton" would scrape both OH and TN.
+              ...(splitCountyValue(selectedCounty).state
+                ? { state: splitCountyValue(selectedCounty).state }
+                : {}),
+            }
+          : {}),
       });
       const message = result.message?.trim() || "Scrape started";
       setScrapeLog([message]);
@@ -428,7 +463,9 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     }
   };
 
-  const enrichState = counties.find((c) => c.name === enrichCounty)?.state ?? "";
+  // enrichCounty is a "<name>|<ST>" value, so the state comes from the selection
+  // itself. Looking it up by name would return Hamilton OH for a Hamilton TN pick.
+  const enrichState = splitCountyValue(enrichCounty).state ?? "";
   const enrichFormValid = Boolean(enrichCounty) && Boolean(enrichState) && enrichLimit > 0;
 
   const openEnrichDialog = () => {
@@ -443,7 +480,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     setEnriching(true);
     try {
       const result = await enrichLeads({
-        county: enrichCounty,
+        county: splitCountyValue(enrichCounty).county,
         state: enrichState,
         limit: enrichLimit,
       });
@@ -460,7 +497,11 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
   };
 
   const handleOpenDeleteLeadsDialog = () => {
-    setDeleteCounty(selectedCounty !== "all" ? selectedCounty : "");
+    // selectedCounty is composite — split it so the text field shows a plain name
+    // and the delete is scoped to the right state.
+    const { county, state } = splitCountyValue(selectedCounty);
+    setDeleteCounty(county);
+    setDeleteState(state ?? "");
     setDeleteSourceUrl("");
     setDeleteOwnerNameContains(search.trim());
     setShowDeleteLeadsDialog(true);
@@ -478,6 +519,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
     try {
       const result = await deleteLeads({
         county: deleteCounty.trim() || undefined,
+        state: deleteState.trim().toUpperCase() || undefined,
         source_url: deleteSourceUrl.trim() || undefined,
         owner_name_contains: deleteOwnerNameContains.trim() || undefined,
       });
@@ -765,7 +807,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
             className="w-full min-w-[12.5rem]"
             options={[
               { value: "all", label: "All Counties" },
-              ...counties.map((c) => ({ value: c.name, label: `${c.name}, ${c.state}` })),
+              ...counties.map((c) => ({ value: countyValue(c), label: `${c.name}, ${c.state}` })),
             ]}
           />
           <AtlasSelect
@@ -1059,7 +1101,7 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                 placeholder="Select county"
                 className="w-full"
                 options={counties.map((c) => ({
-                  value: c.name,
+                  value: countyValue(c),
                   label: `${c.name}, ${c.state}`,
                 }))}
               />
@@ -1263,6 +1305,19 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
                 value={deleteCounty}
                 onChange={(e) => setDeleteCounty(e.target.value)}
                 placeholder="e.g. Franklin"
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-white/50">
+                State <span className="text-white/30">(required when the county name exists in more than one state, e.g. Hamilton OH / TN)</span>
+              </label>
+              <input
+                type="text"
+                value={deleteState}
+                onChange={(e) => setDeleteState(e.target.value.toUpperCase().slice(0, 2))}
+                placeholder="e.g. TN"
+                maxLength={2}
                 className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/20"
               />
             </div>

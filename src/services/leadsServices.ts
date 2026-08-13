@@ -151,6 +151,7 @@ export async function skipTraceLead(id: string) {
 function buildLeadsExportQuery(params: LeadsExportParams = {}): Record<string, string> {
   const query: Record<string, string> = {};
   if (params.county) query.county = params.county;
+  if (params.state) query.state = params.state;
   if (params.lead_type) query.lead_type = params.lead_type;
   if (params.status) query.status = params.status;
   if (params.from_date) query.from_date = params.from_date;
@@ -170,9 +171,12 @@ async function readBlobErrorMessage(blob: Blob): Promise<string> {
 function buildDeleteLeadsPayload(payload: DeleteLeadsPayload): DeleteLeadsPayload {
   const next: DeleteLeadsPayload = {};
   const county = payload.county?.trim();
+  const state = payload.state?.trim().toUpperCase();
   const sourceUrl = payload.source_url?.trim();
   const ownerNameContains = payload.owner_name_contains?.trim();
   if (county) next.county = county;
+  // Only meaningful with a county — it narrows which state's Hamilton is deleted.
+  if (county && state) next.state = state;
   if (sourceUrl) next.source_url = sourceUrl;
   if (ownerNameContains) next.owner_name_contains = ownerNameContains;
   return next;

@@ -43,6 +43,8 @@ export interface TriggerScrapePayload {
   to_date: string;
   /** Restrict the run to a single county (matches the backend county name). */
   county?: string;
+  /** Narrows `county` to one state; required when the name exists in two (Hamilton OH / TN). */
+  state?: string;
   /** Restrict the run to a single lead type. */
   lead_type?: string;
 }

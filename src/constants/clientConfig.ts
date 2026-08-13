@@ -68,5 +68,25 @@ export const CLIENT_CONFIG = {
       state: "OH",
       leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate", "Sheriff Sale", "Lis Pendens"],
     },
+    // Hamilton County TENNESSEE (Chattanooga) — distinct from Hamilton County OHIO
+    // above. Same county name, different state; everything is keyed on the pair.
+    {
+      name: "Hamilton",
+      state: "TN",
+      leadTypes: [
+        "Pre-Foreclosure",
+        "Tax Delinquent",
+        "Probate",
+        "Code Violation",
+        "Vacant/Abandoned",
+        "Fire Damage",
+        "Divorce",
+        "Bankruptcy",
+        "Out-of-State Owner",
+        "Absentee Owner",
+        "Obituary",
+        "FSBO",
+      ],
+    },
   ],
 } as const;
