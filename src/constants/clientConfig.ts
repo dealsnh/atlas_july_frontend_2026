@@ -3,6 +3,13 @@ export const CLIENT_CONFIG = {
   companyName: "National Houses",
   accentColor: "#DC2626",
   counties: [
+    // Orange County, California — initial launch is limited to the verified
+    // bankruptcy RSS + countywide parcel-roll completion workflow.
+    {
+      name: "Orange",
+      state: "CA",
+      leadTypes: ["Bankruptcy"],
+    },
     {
       name: "Jackson",
       state: "MO",
