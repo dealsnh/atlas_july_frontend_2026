@@ -10,73 +10,7 @@ export const CLIENT_CONFIG = {
       state: "CA",
       leadTypes: ["Bankruptcy"],
     },
-    {
-      name: "Jackson",
-      state: "MO",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate", "Sheriff Sale", "Lis Pendens"],
-    },
-    {
-      name: "Clay",
-      state: "MO",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate"],
-    },
-    {
-      name: "Platte",
-      state: "MO",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Cass",
-      state: "MO",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Madison",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate", "Sheriff Sale"],
-    },
-    {
-      name: "Limestone",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Morgan",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Montgomery",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate"],
-    },
-    {
-      name: "Autauga",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Elmore",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Jefferson",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate", "Sheriff Sale"],
-    },
-    {
-      name: "Shelby",
-      state: "AL",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent"],
-    },
-    {
-      name: "Hamilton",
-      state: "OH",
-      leadTypes: ["Pre-Foreclosure", "Tax Delinquent", "Probate", "Sheriff Sale", "Lis Pendens"],
-    },
-    // Hamilton County TENNESSEE (Chattanooga) — distinct from Hamilton County OHIO
-    // above. Same county name, different state; everything is keyed on the pair.
+    // Hamilton County, Tennessee (Chattanooga).
     {
       name: "Hamilton",
       state: "TN",
