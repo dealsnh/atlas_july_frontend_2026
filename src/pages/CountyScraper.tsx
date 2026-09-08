@@ -554,11 +554,36 @@ export default function CountyScraper({ counties }: CountyScraperProps) {
 
   const totalPages = Math.max(1, Math.ceil(leadsTotal / PAGE_SIZE));
   const dbTypes = stats ? stats.byType.map((t) => t.lead_type) : leads.map((l) => l.lead_type);
+  // A county with its own configured leadTypes (e.g. Orange, CA — only the
+  // sources actually verified/built there) narrows the Lead Type dropdown to
+  // just that list. Every other county keeps the full global list, same as
+  // before this narrowed behavior existed.
+  const selectedCountyConfig =
+    selectedCounty === "all"
+      ? undefined
+      : (() => {
+          const { county, state } = splitCountyValue(selectedCounty);
+          return counties.find((c) => c.name === county && (!state || c.state === state));
+        })();
   // Filter out null/undefined/empty/whitespace lead types: a Radix <Select.Item value="">
   // (from leads with a NULL/empty lead_type) throws and crashes the Lead Type dropdown on open.
-  const allTypes = Array.from(
-    new Set([...LEAD_TYPES, ...dbTypes].filter((t): t is string => typeof t === "string" && t.trim() !== "")),
-  ).sort();
+  const allTypes = selectedCountyConfig?.leadTypes?.length
+    ? [...selectedCountyConfig.leadTypes]
+    : Array.from(
+        new Set([...LEAD_TYPES, ...dbTypes].filter((t): t is string => typeof t === "string" && t.trim() !== "")),
+      ).sort();
+
+  // Switching to a county whose narrowed list no longer includes the current
+  // Lead Type filter (e.g. "Divorce" was selected, then the county changes to
+  // Orange, CA) would otherwise leave an invalid filter silently applied.
+  useEffect(() => {
+    if (selectedType !== "all" && !allTypes.includes(selectedType)) {
+      setSelectedType("all");
+      setPage(0);
+    }
+    // Only re-check when the county selection itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCounty]);
 
   return (
     <div className="atlas-page-shell">
