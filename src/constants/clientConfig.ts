@@ -3,12 +3,13 @@ export const CLIENT_CONFIG = {
   companyName: "National Houses",
   accentColor: "#DC2626",
   counties: [
-    // Orange County, California — initial launch is limited to the verified
-    // bankruptcy RSS + countywide parcel-roll completion workflow.
+    // Orange County, California — verified sources only: Central District
+    // bankruptcy RSS and capublicnotice.com probate notices, both completed
+    // against the countywide public parcel roll.
     {
       name: "Orange",
       state: "CA",
-      leadTypes: ["Bankruptcy"],
+      leadTypes: ["Probate", "Bankruptcy"],
     },
     // Hamilton County, Tennessee (Chattanooga).
     {
