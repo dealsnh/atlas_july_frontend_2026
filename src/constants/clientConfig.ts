@@ -4,12 +4,14 @@ export const CLIENT_CONFIG = {
   accentColor: "#DC2626",
   counties: [
     // Orange County, California — verified sources only: Central District
-    // bankruptcy RSS and capublicnotice.com probate notices, both completed
-    // against the countywide public parcel roll.
+    // bankruptcy RSS, capublicnotice.com probate notices, and the roll-derived
+    // Pre-Probate scan (property still on the tax roll as an estate — no
+    // court filing needed to find it), all completed against the countywide
+    // public parcel roll.
     {
       name: "Orange",
       state: "CA",
-      leadTypes: ["Probate", "Bankruptcy"],
+      leadTypes: ["Probate", "Pre-Probate", "Bankruptcy"],
     },
     // Hamilton County, Tennessee (Chattanooga).
     {
