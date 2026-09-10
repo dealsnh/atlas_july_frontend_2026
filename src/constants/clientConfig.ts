@@ -3,15 +3,15 @@ export const CLIENT_CONFIG = {
   companyName: "National Houses",
   accentColor: "#DC2626",
   counties: [
-    // Orange County, California — verified sources only: Central District
-    // bankruptcy RSS, capublicnotice.com probate notices, and the roll-derived
-    // Pre-Probate scan (property still on the tax roll as an estate — no
-    // court filing needed to find it), all completed against the countywide
-    // public parcel roll.
+    // Orange County, California, in priority order: the OC Clerk-Recorder's
+    // trustee-sale filings (Foreclosure), capublicnotice.com probate notices,
+    // the roll-derived Pre-Probate scan (property still on the tax roll as an
+    // estate — no court filing needed to find it), and Central District
+    // bankruptcy RSS — all completed against the countywide public parcel roll.
     {
       name: "Orange",
       state: "CA",
-      leadTypes: ["Probate", "Pre-Probate", "Bankruptcy"],
+      leadTypes: ["Foreclosure", "Probate", "Pre-Probate", "Bankruptcy"],
     },
     // Hamilton County, Tennessee (Chattanooga).
     {
