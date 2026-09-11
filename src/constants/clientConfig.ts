@@ -4,17 +4,31 @@ export const CLIENT_CONFIG = {
   accentColor: "#DC2626",
   counties: [
     // Orange County, California, in priority order: the OC Clerk-Recorder's
-    // trustee-sale filings (Foreclosure); Code Violation from two of OC's 34
-    // incorporated cities (Anaheim, Irvine — no countywide feed exists, each
-    // city runs its own program); capublicnotice.com probate notices; the
+    // trustee-sale filings (Foreclosure); Code Violation from three of OC's
+    // 34 incorporated cities (Anaheim, Irvine, Newport Beach — no countywide
+    // feed exists, each city runs its own program); Tax Delinquent from
+    // bid4assets.com's Orange County tax-defaulted property auction
+    // storefront (public, no login needed — reports whatever's currently
+    // posted and open, since the county's auction schedule is irregular,
+    // not a fixed calendar); capublicnotice.com probate notices; the
     // roll-derived Pre-Probate scan (property still on the tax roll as an
     // estate — no court filing needed to find it); and Central District
     // bankruptcy RSS — all completed against the countywide public parcel
-    // roll where a lookup is needed.
+    // roll where a lookup is needed. Water Shutoff was evaluated and
+    // eliminated: California's SB 998 only requires utilities to report an
+    // annual aggregate count of disconnections, never a list of addresses,
+    // so there is no lawful path to individual leads from it.
     {
       name: "Orange",
       state: "CA",
-      leadTypes: ["Foreclosure", "Code Violation", "Probate", "Pre-Probate", "Bankruptcy"],
+      leadTypes: [
+        "Foreclosure",
+        "Code Violation",
+        "Tax Delinquent",
+        "Probate",
+        "Pre-Probate",
+        "Bankruptcy",
+      ],
     },
     // Hamilton County, Tennessee (Chattanooga).
     {
