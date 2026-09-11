@@ -4,10 +4,10 @@ export const CLIENT_CONFIG = {
   accentColor: "#DC2626",
   counties: [
     // Orange County, California, in priority order: the OC Clerk-Recorder's
-    // trustee-sale filings (Foreclosure); Code Violation from three of OC's
-    // 34 incorporated cities (Anaheim, Irvine, Newport Beach — no countywide
-    // feed exists, each city runs its own program); Tax Delinquent from
-    // bid4assets.com's Orange County tax-defaulted property auction
+    // trustee-sale filings (Foreclosure); Code Violation from four of OC's
+    // 34 incorporated cities (Anaheim, Irvine, Newport Beach, Garden Grove —
+    // no countywide feed exists, each city runs its own program); Tax
+    // Delinquent from bid4assets.com's Orange County tax-defaulted property auction
     // storefront (public, no login needed — reports whatever's currently
     // posted and open, since the county's auction schedule is irregular,
     // not a fixed calendar); capublicnotice.com probate notices; the
