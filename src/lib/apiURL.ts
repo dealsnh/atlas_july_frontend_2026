@@ -33,4 +33,7 @@ export const END_POINT = {
     deleteLeads: "/admin/leads",
     enrich: "/admin/enrich",
   },
+  propertyCondition: {
+    analyze: "/property-condition/analyze",
+  },
 } as const;

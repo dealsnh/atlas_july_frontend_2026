@@ -1,7 +1,7 @@
 // Atlas App — Main routing and auth
 // CLIENT_CONFIG lives in constants/clientConfig.ts
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Route, Switch, Redirect } from "wouter";
 import AppLayout from "./components/AppLayout";
 import Login from "./pages/Login";
@@ -18,13 +18,6 @@ export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
-  const [apiKeys, setApiKeys] = useState<{ googleMaps: string; openAi: string }>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("atlas_api_keys") || "{}");
-    } catch {
-      return { googleMaps: "", openAi: "" };
-    }
-  });
 
   useEffect(() => {
     initializeAuth();
@@ -90,10 +83,7 @@ export default function App() {
           />
         </Route>
         <Route path={APP_ROUTES.PROPERTY_CONDITION}>
-          <PropertyCondition
-            googleMapsConfigured={!!apiKeys.googleMaps}
-            openAiConfigured={!!apiKeys.openAi}
-          />
+          <PropertyCondition />
         </Route>
         <Route path={APP_ROUTES.SETTINGS}>
           <Settings />

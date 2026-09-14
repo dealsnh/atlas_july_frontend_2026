@@ -37,6 +37,8 @@ export const settingsSaveSchema = z.object({
   skip_trace_key: optionalNonEmptyString,
   bright_data_pass: optionalNonEmptyString,
   attom_api_key: optionalNonEmptyString,
+  google_maps_api_key: optionalNonEmptyString,
+  anthropic_api_key: optionalNonEmptyString,
 });
 
 export type SettingsSaveFormValues = z.infer<typeof settingsSaveSchema>;
