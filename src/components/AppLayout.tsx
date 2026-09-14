@@ -189,10 +189,10 @@ export default function AppLayout({ children, companyName, accentColor }: AppLay
   );
 
   return (
-    <div className="flex h-screen bg-[#080810] overflow-hidden">
+    <div className="flex h-screen bg-[#080810] overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       {/* Desktop sidebar */}
       <aside
-        className={`hidden md:flex shrink-0 flex-col transition-[width] duration-300 ease-in-out ${
+        className={`hidden md:flex shrink-0 flex-col transition-[width] duration-300 ease-in-out print:hidden ${
           sidebarCollapsed ? "w-14" : "w-48"
         }`}
         style={{ background: "#0c0c18", borderRight: "1px solid rgba(255,255,255,0.06)" }}
@@ -225,10 +225,10 @@ export default function AppLayout({ children, companyName, accentColor }: AppLay
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible">
         {/* Mobile header */}
         <div
-          className="md:hidden flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.07]"
+          className="md:hidden flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.07] print:hidden"
           style={{ background: "#0c0c18" }}
         >
           <button
@@ -247,7 +247,7 @@ export default function AppLayout({ children, companyName, accentColor }: AppLay
           </div>
           <span className="text-white font-bold text-sm">Atlas</span>
         </div>
-        <main className="flex-1 overflow-y-auto bg-[#080810]">
+        <main className="flex-1 overflow-y-auto bg-[#080810] print:overflow-visible print:bg-white">
           {children}
         </main>
       </div>

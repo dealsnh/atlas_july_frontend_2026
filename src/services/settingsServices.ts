@@ -21,6 +21,8 @@ const SECRET_FIELDS = [
   "skip_trace_key",
   "bright_data_pass",
   "attom_api_key",
+  "google_maps_api_key",
+  "anthropic_api_key",
 ] as const satisfies ReadonlyArray<keyof SettingsSavePayload>;
 
 export function isMaskedSecretValue(value: string): boolean {
@@ -108,6 +110,8 @@ export function settingsToFormValues(data: AppSettings): Record<string, string> 
     scraper_api_key: data.scraper_api_key || "",
     skip_trace_key: data.skip_trace_key || "",
     attom_api_key: data.attom_api_key || "",
+    google_maps_api_key: data.google_maps_api_key || "",
+    anthropic_api_key: data.anthropic_api_key || "",
   };
 }
 

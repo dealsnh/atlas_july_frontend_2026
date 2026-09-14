@@ -35,11 +35,15 @@ export interface AppSettings {
   bright_data_user: string;
   bright_data_pass: string;
   attom_api_key: string;
+  google_maps_api_key: string;
+  anthropic_api_key: string;
   smtp_configured: boolean;
   scraper_api_configured: boolean;
   skip_trace_configured: boolean;
   bright_data_configured: boolean;
   attom_configured: boolean;
+  google_maps_configured: boolean;
+  anthropic_configured: boolean;
 }
 
 /** Writable settings fields (secrets may be omitted on save). */
@@ -58,6 +62,8 @@ export type SettingsSavePayload = Partial<
     | "bright_data_user"
     | "bright_data_pass"
     | "attom_api_key"
+    | "google_maps_api_key"
+    | "anthropic_api_key"
   >
 >;
 

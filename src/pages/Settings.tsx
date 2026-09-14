@@ -141,6 +141,8 @@ export default function Settings() {
       scraper_api_key: "",
       skip_trace_key: "",
       attom_api_key: "",
+      google_maps_api_key: "",
+      anthropic_api_key: "",
     },
     mode: "onChange",
     reValidateMode: "onChange",
@@ -354,6 +356,38 @@ export default function Settings() {
               error={errors.attom_api_key?.message}
               {...register("attom_api_key")}
             />
+          </div>
+
+          <hr className="border-slate-700/50" />
+
+          {/* Property Condition AI — Google Maps + Anthropic */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="font-medium text-white">Property Condition AI</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Satellite + Street View imagery and AI condition scoring for any address</p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full border ${settings.google_maps_configured && settings.anthropic_configured ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/45" : "bg-orange-500/25 text-orange-300 border-orange-500/45"}`}>
+                {settings.google_maps_configured && settings.anthropic_configured ? "✓ Configured" : "Not configured"}
+              </span>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <InputField
+                label="Google Maps API Key"
+                placeholder="Your Google Maps API key"
+                hint="Needs Maps Static API + Street View Static API enabled"
+                error={errors.google_maps_api_key?.message}
+                {...register("google_maps_api_key")}
+              />
+              <InputField
+                label="Anthropic API Key"
+                placeholder="sk-ant-..."
+                masked
+                hint="From console.anthropic.com → API Keys"
+                error={errors.anthropic_api_key?.message}
+                {...register("anthropic_api_key")}
+              />
+            </div>
           </div>
 
           <hr className="border-slate-700/50" />

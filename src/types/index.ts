@@ -62,3 +62,9 @@ export type {
   TestEmailPayload,
   TestEmailResponse,
 } from "./settings";
+
+export type {
+  PropertyConditionResult,
+  AnalyzePropertyConditionPayload,
+  AnalyzePropertyConditionApiResponse,
+} from "./propertyCondition";
